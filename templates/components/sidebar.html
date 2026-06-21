@@ -1,0 +1,78 @@
+<!-- Sidebar Component -->
+<aside id="sidebar" class="sidebar fixed top-0 left-0 h-full w-[240px] bg-surface-sidebar shadow-sidebar z-40 flex flex-col transition-smooth overflow-y-auto">
+    <!-- Brand -->
+    <div class="px-6 pt-6 pb-2">
+        <h1 class="text-xl font-bold text-gray-800 tracking-tight">UNIVERSITY</h1>
+    </div>
+
+    <!-- User Profile Card -->
+    <div class="px-6 py-4 flex flex-col items-center">
+        <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-primary-200 mb-2">
+            <img src="https://ui-avatars.com/api/?name=Adam&background=14b8a6&color=fff&size=64" 
+                 alt="User Avatar" class="w-full h-full object-cover">
+        </div>
+        <div class="flex items-center gap-1">
+            <span class="text-sm font-medium text-gray-700">Adam</span>
+            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="flex-1 px-4 py-2 space-y-1">
+        <a href="{% url 'dashboard' %}" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-600 transition-smooth {% if active_page == 'dashboard' %}active{% endif %}">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+            </svg>
+            Dashboard
+        </a>
+        <a href="#" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-600 transition-smooth {% if active_page == 'courses' %}active{% endif %}">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+            </svg>
+            Courses
+        </a>
+        <a href="#" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-600 transition-smooth {% if active_page == 'homeworks' %}active{% endif %}">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            Homeworks
+        </a>
+        <a href="{% url 'exam_page' %}" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-600 transition-smooth {% if active_page == 'exams' %}active{% endif %}">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+            </svg>
+            Exams
+        </a>
+        <a href="#" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-600 transition-smooth {% if active_page == 'statistics' %}active{% endif %}">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Statistic
+        </a>
+    </nav>
+
+    <!-- Bottom Section -->
+    <div class="px-4 pb-4 space-y-3">
+        <!-- Download App Card -->
+        <div class="bg-gradient-to-br from-primary-50 to-primary-100 rounded-2xl p-4 text-center">
+            <div class="w-16 h-16 mx-auto mb-2">
+                <svg class="w-full h-full text-primary-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-5l-3 3-1.41-1.41L12 7.67l5.41 5.42L16 14.5l-3-3v5h-2z"/>
+                </svg>
+            </div>
+            <button class="bg-gray-800 text-white text-xs font-medium px-4 py-2 rounded-full hover:bg-gray-700 transition-smooth">
+                Download now
+            </button>
+        </div>
+
+        <!-- Support -->
+        <button class="w-full flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-smooth">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/>
+            </svg>
+            Need support
+        </button>
+    </div>
+</aside>

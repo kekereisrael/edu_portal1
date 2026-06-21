@@ -251,3 +251,63 @@ class ClassRoom(models.Model):
             role=SchoolMembership.SchoolRole.STUDENT,
             is_active=True,
         ).count()
+
+
+class StorageUsage(models.Model):
+    """Track storage consumption per school for quota enforcement."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.OneToOneField(
+        School, on_delete=models.CASCADE, related_name='storage_usage'
+    )
+    used_bytes = models.BigIntegerField(
+        default=0, help_text='Total storage used in bytes'
+    )
+    file_count = models.IntegerField(
+        default=0, help_text='Total number of files stored'
+    )
+    last_calculated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'storage usage'
+        verbose_name_plural = 'storage usages'
+
+    def __str__(self):
+        return f'{self.school.name} - {self.used_bytes_display}'
+
+    @property
+    def used_bytes_display(self):
+        """Human-readable storage usage."""
+        if self.used_bytes < 1024:
+            return f'{self.used_bytes} B'
+        elif self.used_bytes < 1024 ** 2:
+            return f'{self.used_bytes / 1024:.1f} KB'
+        elif self.used_bytes < 1024 ** 3:
+            return f'{self.used_bytes / (1024 ** 2):.1f} MB'
+        return f'{self.used_bytes / (1024 ** 3):.2f} GB'
+
+    @property
+    def used_gb(self):
+        """Storage used in GB."""
+        return self.used_bytes / (1024 ** 3)
+
+    def add_file(self, file_size_bytes):
+        """Record a new file upload."""
+        self.used_bytes += file_size_bytes
+        self.file_count += 1
+        self.save(update_fields=['used_bytes', 'file_count', 'last_calculated_at'])
+
+    def remove_file(self, file_size_bytes):
+        """Record a file deletion."""
+        self.used_bytes = max(0, self.used_bytes - file_size_bytes)
+        self.file_count = max(0, self.file_count - 1)
+        self.save(update_fields=['used_bytes', 'file_count', 'last_calculated_at'])
+
+    def is_within_quota(self, additional_bytes=0):
+        """Check if school is within storage quota based on their plan."""
+        try:
+            subscription = self.school.subscription
+            max_storage_bytes = subscription.plan.max_storage_gb * (1024 ** 3)
+            return (self.used_bytes + additional_bytes) <= max_storage_bytes
+        except Exception:
+            return False

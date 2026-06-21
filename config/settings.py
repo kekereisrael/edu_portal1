@@ -34,9 +34,17 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
+    'core',
     'accounts',
     'schools',
     'subscriptions',
+    'subjects',
+    'exams',
+    'materials',
+    'notifications',
+    'payments',
+    'analytics',
+    'communications',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -50,8 +58,13 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.security.SecurityHeaders',
+    'core.security.IPBlockingMiddleware',
+    'core.security.RequestSizeLimitMiddleware',
+    'core.security.AuditLogMiddleware',
     'schools.middleware.SchoolContextMiddleware',
     'subscriptions.middleware.SubscriptionMiddleware',
+    'core.security.SchoolIsolationMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -124,6 +137,26 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'core.throttling.BurstRateThrottle',
+        'core.throttling.SustainedRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'burst': '60/min',
+        'sustained': '1000/day',
+        'anon_burst': '20/min',
+        'anon_sustained': '200/day',
+        'login': '5/min',
+        'password_reset': '3/hour',
+        'email_verification': '5/hour',
+        'payment_webhook': '100/min',
+        'ai_usage': '30/hour',
+        'file_upload': '20/hour',
+        'exam_submission': '10/min',
+        'subscription_aware': '1000/hour',
+        'bulk_operation': '5/hour',
+        'search': '30/min',
+    },
     'DEFAULT_FILTER_BACKENDS': (
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
@@ -135,6 +168,7 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ),
+    'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler',
 }
 
 # JWT Settings
@@ -190,6 +224,9 @@ FLUTTERWAVE_PUBLIC_KEY = config('FLUTTERWAVE_PUBLIC_KEY', default='')
 # AI/LLM Settings
 OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
+
+# Frontend URL (for email links)
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 
 # File Upload Settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB

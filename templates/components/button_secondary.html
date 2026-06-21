@@ -1,0 +1,11 @@
+<!-- Secondary Button -->
+<!-- Usage: {% include "components/button_secondary.html" with text="Cancel" size="md" %} -->
+
+<button class="inline-flex items-center justify-center gap-2 
+    {% if size == 'lg' %}px-6 py-3 text-base{% elif size == 'sm' %}px-3 py-1.5 text-xs{% else %}px-4 py-2.5 text-sm{% endif %}
+    font-medium text-gray-700 bg-white border border-gray-200 rounded-xl 
+    hover:bg-gray-50 active:bg-gray-100 
+    focus:outline-none focus:ring-2 focus:ring-gray-100 
+    transition-smooth">
+    {{ text }}
+</button>

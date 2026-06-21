@@ -343,3 +343,310 @@ class SchoolAddOn(models.Model):
         if self.expires_at:
             return timezone.now() > self.expires_at
         return False
+
+
+class PlanChangeRequest(models.Model):
+    """Pending upgrade/downgrade requests for handling proration and scheduled changes."""
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+        COMPLETED = 'completed', 'Completed'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    subscription = models.ForeignKey(
+        Subscription, on_delete=models.CASCADE, related_name='change_requests', db_index=True
+    )
+    from_plan = models.ForeignKey(
+        Plan, on_delete=models.PROTECT, related_name='change_requests_from'
+    )
+    to_plan = models.ForeignKey(
+        Plan, on_delete=models.PROTECT, related_name='change_requests_to'
+    )
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True
+    )
+    change_type = models.CharField(
+        max_length=10,
+        choices=[('upgrade', 'Upgrade'), ('downgrade', 'Downgrade')],
+    )
+    scheduled_date = models.DateTimeField(
+        help_text='When the change should take effect'
+    )
+    proration_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text='Amount to credit/charge for proration'
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    reason = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'plan change request'
+        verbose_name_plural = 'plan change requests'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(
+                fields=['subscription', 'status'], name='idx_planchange_sub_status'
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.subscription.school.name}: {self.from_plan.name} -> {self.to_plan.name} ({self.status})'
+
+    def complete(self):
+        """Mark the change request as completed and apply the plan change."""
+        if self.change_type == 'upgrade':
+            self.subscription.upgrade(self.to_plan)
+        else:
+            self.subscription.downgrade(self.to_plan)
+        self.status = self.Status.COMPLETED
+        self.completed_at = timezone.now()
+        self.save(update_fields=['status', 'completed_at'])
+
+    def cancel(self):
+        """Cancel the pending change request."""
+        self.status = self.Status.CANCELLED
+        self.cancelled_at = timezone.now()
+        self.save(update_fields=['status', 'cancelled_at'])
+
+
+class UsageRecord(models.Model):
+    """Track feature usage against plan limits for enforcement and analytics."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey(
+        'schools.School', on_delete=models.CASCADE, related_name='usage_records', db_index=True
+    )
+    feature_key = models.CharField(
+        max_length=50, db_index=True,
+        help_text='Feature identifier, e.g. "exams_created", "materials_uploaded", "ai_requests"'
+    )
+    usage_count = models.IntegerField(default=0)
+    usage_limit = models.IntegerField(
+        default=-1, help_text='-1 for unlimited'
+    )
+    period_start = models.DateField()
+    period_end = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'usage record'
+        verbose_name_plural = 'usage records'
+        unique_together = ['school', 'feature_key', 'period_start']
+        ordering = ['-period_start']
+        indexes = [
+            models.Index(
+                fields=['school', 'feature_key', 'period_start'],
+                name='idx_usage_sch_feat_period',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.school.name} - {self.feature_key}: {self.usage_count}/{self.usage_limit}'
+
+    @property
+    def is_within_limit(self):
+        """Check if usage is within the allowed limit."""
+        if self.usage_limit == -1:
+            return True  # Unlimited
+        return self.usage_count < self.usage_limit
+
+    @property
+    def usage_percentage(self):
+        """Get usage as a percentage of the limit."""
+        if self.usage_limit == -1:
+            return 0
+        if self.usage_limit == 0:
+            return 100
+        return min(100, (self.usage_count / self.usage_limit) * 100)
+
+    def increment(self, amount=1):
+        """Increment usage count. Returns True if within limit."""
+        if not self.is_within_limit:
+            return False
+        self.usage_count += amount
+        self.save(update_fields=['usage_count', 'updated_at'])
+        return True
+
+
+class TrialExtension(models.Model):
+    """Track trial extensions granted to schools."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    subscription = models.ForeignKey(
+        Subscription, on_delete=models.CASCADE, related_name='trial_extensions', db_index=True
+    )
+    extended_days = models.IntegerField(
+        help_text='Number of days the trial was extended'
+    )
+    reason = models.TextField(
+        help_text='Reason for granting the extension'
+    )
+    granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='granted_trial_extensions',
+    )
+    original_trial_end = models.DateTimeField(
+        help_text='Trial end date before extension'
+    )
+    new_trial_end = models.DateTimeField(
+        help_text='Trial end date after extension'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'trial extension'
+        verbose_name_plural = 'trial extensions'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.subscription.school.name} - +{self.extended_days} days'
+
+    def save(self, *args, **kwargs):
+        if not self.original_trial_end:
+            self.original_trial_end = self.subscription.trial_end
+        if not self.new_trial_end:
+            self.new_trial_end = self.original_trial_end + timezone.timedelta(
+                days=self.extended_days
+            )
+        super().save(*args, **kwargs)
+        # Update the subscription trial end date
+        self.subscription.trial_end = self.new_trial_end
+        self.subscription.save(update_fields=['trial_end'])
+
+
+class Referral(models.Model):
+    """Track school referrals for the referral program."""
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        COMPLETED = 'completed', 'Completed'
+        EXPIRED = 'expired', 'Expired'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    referrer_school = models.ForeignKey(
+        'schools.School', on_delete=models.CASCADE,
+        related_name='referrals_made', db_index=True,
+    )
+    referred_school = models.ForeignKey(
+        'schools.School', on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='referred_by',
+    )
+    referral_code = models.CharField(
+        max_length=20, unique=True, db_index=True,
+    )
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Referral code expiry date'
+    )
+
+    class Meta:
+        verbose_name = 'referral'
+        verbose_name_plural = 'referrals'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.referrer_school.name} -> {self.referral_code} ({self.status})'
+
+    @property
+    def is_expired(self):
+        if self.expires_at:
+            return timezone.now() > self.expires_at
+        return False
+
+    def complete(self, referred_school):
+        """Mark referral as completed when referred school subscribes."""
+        self.referred_school = referred_school
+        self.status = self.Status.COMPLETED
+        self.completed_at = timezone.now()
+        self.save(update_fields=['referred_school', 'status', 'completed_at'])
+
+
+class ReferralReward(models.Model):
+    """Rewards earned from successful referrals."""
+
+    class RewardType(models.TextChoices):
+        CREDIT = 'credit', 'Account Credit'
+        DISCOUNT = 'discount', 'Subscription Discount'
+        EXTENSION = 'extension', 'Subscription Extension'
+        AI_CREDITS = 'ai_credits', 'AI Credits'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    referral = models.OneToOneField(
+        Referral, on_delete=models.CASCADE, related_name='reward'
+    )
+    reward_type = models.CharField(
+        max_length=20, choices=RewardType.choices
+    )
+    reward_value = models.IntegerField(
+        help_text='Value depends on type: credit amount in NGN, discount %, days extension, or AI credits'
+    )
+    is_claimed = models.BooleanField(default=False)
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='Reward expiry date'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'referral reward'
+        verbose_name_plural = 'referral rewards'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.referral.referrer_school.name} - {self.reward_type}: {self.reward_value}'
+
+    @property
+    def is_expired(self):
+        if self.expires_at:
+            return timezone.now() > self.expires_at
+        return False
+
+    @property
+    def is_claimable(self):
+        return not self.is_claimed and not self.is_expired
+
+    def claim(self):
+        """Claim the reward."""
+        if not self.is_claimable:
+            raise ValueError('Reward is not claimable (already claimed or expired).')
+        self.is_claimed = True
+        self.claimed_at = timezone.now()
+        self.save(update_fields=['is_claimed', 'claimed_at'])
+        # Apply the reward based on type
+        self._apply_reward()
+
+    def _apply_reward(self):
+        """Apply the reward to the referrer school."""
+        school = self.referral.referrer_school
+        if self.reward_type == self.RewardType.AI_CREDITS:
+            try:
+                ai_credit = school.ai_credits
+                ai_credit.balance += self.reward_value
+                ai_credit.save(update_fields=['balance', 'updated_at'])
+            except Exception:
+                pass
+        elif self.reward_type == self.RewardType.EXTENSION:
+            try:
+                subscription = school.subscription
+                if subscription.current_period_end:
+                    subscription.current_period_end += timezone.timedelta(
+                        days=self.reward_value
+                    )
+                    subscription.save(update_fields=['current_period_end'])
+            except Exception:
+                pass
