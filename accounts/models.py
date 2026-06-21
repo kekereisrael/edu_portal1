@@ -3,8 +3,11 @@ Custom User model and profile models for the accounts app.
 """
 
 import uuid
+import secrets
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
@@ -163,3 +166,131 @@ class LoginAttempt(models.Model):
     def __str__(self):
         status = 'Success' if self.success else 'Failed'
         return f'{self.email} - {status} at {self.attempted_at}'
+
+
+class EmailVerificationToken(models.Model):
+    """Store email verification tokens for secure email verification flow."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='email_verification_tokens'
+    )
+    token = models.CharField(
+        max_length=64, unique=True, db_index=True, default=secrets.token_urlsafe
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'email verification token'
+        verbose_name_plural = 'email verification tokens'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_used'], name='idx_email_verify_user_used'),
+            models.Index(fields=['expires_at'], name='idx_email_verify_expires'),
+        ]
+
+    def __str__(self):
+        return f'Verification token for {self.user.email}'
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timezone.timedelta(hours=24)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    @property
+    def is_valid(self):
+        return not self.is_used and not self.is_expired
+
+    def mark_used(self):
+        """Mark token as used and verify the user's email."""
+        self.is_used = True
+        self.used_at = timezone.now()
+        self.save(update_fields=['is_used', 'used_at'])
+        # Mark user as verified
+        self.user.is_verified = True
+        self.user.save(update_fields=['is_verified'])
+
+    @classmethod
+    def create_for_user(cls, user):
+        """Create a new verification token, invalidating any existing ones."""
+        cls.objects.filter(user=user, is_used=False).update(is_used=True)
+        return cls.objects.create(
+            user=user,
+            expires_at=timezone.now() + timezone.timedelta(hours=24),
+        )
+
+
+class PasswordResetToken(models.Model):
+    """Store password reset tokens with expiry for secure password reset flow."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='password_reset_tokens'
+    )
+    token = models.CharField(
+        max_length=64, unique=True, db_index=True, default=secrets.token_urlsafe
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    used_at = models.DateTimeField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(
+        help_text='IP address that requested the reset'
+    )
+
+    class Meta:
+        verbose_name = 'password reset token'
+        verbose_name_plural = 'password reset tokens'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_used'], name='idx_pwd_reset_user_used'),
+            models.Index(fields=['expires_at'], name='idx_pwd_reset_expires'),
+        ]
+
+    def __str__(self):
+        return f'Password reset token for {self.user.email}'
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timezone.timedelta(hours=1)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    @property
+    def is_valid(self):
+        return not self.is_used and not self.is_expired
+
+    def mark_used(self):
+        """Mark token as used."""
+        self.is_used = True
+        self.used_at = timezone.now()
+        self.save(update_fields=['is_used', 'used_at'])
+
+    @classmethod
+    def create_for_user(cls, user, ip_address):
+        """Create a new reset token, invalidating any existing ones."""
+        # Check rate limiting: max 3 reset requests per hour
+        recent_count = cls.objects.filter(
+            user=user,
+            created_at__gte=timezone.now() - timezone.timedelta(hours=1),
+        ).count()
+        if recent_count >= 3:
+            raise ValueError('Too many password reset requests. Please try again later.')
+
+        # Invalidate existing tokens
+        cls.objects.filter(user=user, is_used=False).update(is_used=True)
+        return cls.objects.create(
+            user=user,
+            ip_address=ip_address,
+            expires_at=timezone.now() + timezone.timedelta(hours=1),
+        )
