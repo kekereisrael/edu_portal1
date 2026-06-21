@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Exam - University Portal{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        exam: {
+                            bg: '#1a2332',
+                            sidebar: '#0f1923',
+                            card: '#243447',
+                            border: '#2d4a5e',
+                            text: '#e2e8f0',
+                            muted: '#94a3b8',
+                            accent: '#38bdf8',
+                            hover: '#1e3a4f',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1a2332; }
+        ::-webkit-scrollbar-thumb { background: #2d4a5e; border-radius: 3px; }
+        .transition-smooth { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-exam-bg text-exam-text min-h-screen">
+    <div class="flex min-h-screen">
+        <!-- Exam Sidebar -->
+        {% block exam_sidebar %}
+        {% include "components/exam_sidebar.html" %}
+        {% endblock %}
+
+        <!-- Main Exam Content -->
+        <div class="flex-1 flex flex-col ml-0 lg:ml-[240px]">
+            <!-- Exam Top Bar -->
+            {% block exam_topbar %}
+            {% include "components/exam_topbar.html" %}
+            {% endblock %}
+
+            <!-- Exam Content -->
+            <main class="flex-1 p-4 md:p-8 overflow-y-auto">
+                {% block content %}{% endblock %}
+            </main>
+
+            <!-- Bottom Navigation -->
+            {% block exam_navigation %}
+            {% include "components/exam_navigation.html" %}
+            {% endblock %}
+        </div>
+    </div>
+
+    <!-- Mobile Sidebar Toggle -->
+    <button id="exam-menu-toggle" onclick="toggleExamSidebar()" class="lg:hidden fixed top-4 left-4 z-50 p-2 bg-exam-card rounded-lg border border-exam-border">
+        <svg class="w-5 h-5 text-exam-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+    </button>
+
+    <script>
+        function toggleExamSidebar() {
+            const sidebar = document.getElementById('exam-sidebar');
+            sidebar.classList.toggle('-translate-x-full');
+        }
+
+        // Timer functionality
+        let timeRemaining = {{ exam_duration_seconds|default:"28767" }};
+        
+        function updateTimer() {
+            const hours = Math.floor(timeRemaining / 3600);
+            const minutes = Math.floor((timeRemaining % 3600) / 60);
+            const seconds = timeRemaining % 60;
+            
+            document.getElementById('timer-display').textContent = 
+                `${String(hours).padStart(2, '0')} : ${String(minutes).padStart(2, '0')} : ${String(seconds).padStart(2, '0')}`;
+            
+            if (timeRemaining > 0) {
+                timeRemaining--;
+                setTimeout(updateTimer, 1000);
+            }
+        }
+        
+        updateTimer();
+    </script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

@@ -442,7 +442,7 @@ class UsageRecord(models.Model):
         indexes = [
             models.Index(
                 fields=['school', 'feature_key', 'period_start'],
-                name='idx_usage_school_feature_period',
+                name='idx_usage_sch_feat_period',
             ),
         ]
 

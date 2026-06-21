@@ -1,0 +1,20 @@
+<!-- Progress Bar Component -->
+<!-- Usage: {% include "components/progress_bar.html" with value=70 color="primary" show_label=True %} -->
+
+<div class="w-full">
+    {% if show_label %}
+    <div class="flex items-center justify-between mb-1">
+        <span class="text-xs text-gray-500">{{ label|default:"Progress" }}</span>
+        <span class="text-xs font-semibold {% if color == 'primary' %}text-primary-600{% elif color == 'green' %}text-green-600{% elif color == 'red' %}text-red-600{% else %}text-gray-600{% endif %}">{{ value }}%</span>
+    </div>
+    {% endif %}
+    <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div class="h-full rounded-full transition-all duration-500 
+            {% if color == 'primary' %}bg-primary-500
+            {% elif color == 'green' %}bg-green-500
+            {% elif color == 'red' %}bg-red-500
+            {% elif color == 'blue' %}bg-blue-500
+            {% else %}bg-primary-500{% endif %}" 
+            style="width: {{ value }}%"></div>
+    </div>
+</div>

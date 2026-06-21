@@ -8,7 +8,13 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
+    # Frontend UI
+    path('', include('frontend_urls')),
+
+    # Admin
     path('admin/', admin.site.urls),
+
+    # API endpoints
     path('api/v1/auth/', include('accounts.urls')),
     path('api/v1/schools/', include('schools.urls')),
     path('api/v1/subscriptions/', include('subscriptions.urls')),

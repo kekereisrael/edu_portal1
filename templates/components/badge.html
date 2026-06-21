@@ -1,0 +1,16 @@
+<!-- Badge Component -->
+<!-- Usage: {% include "components/badge.html" with text="Active" color="green" size="sm" %} -->
+
+<span class="inline-flex items-center 
+    {% if size == 'lg' %}px-3 py-1.5 text-sm{% elif size == 'xs' %}px-1.5 py-0.5 text-[10px]{% else %}px-2.5 py-1 text-xs{% endif %} 
+    font-medium rounded-full
+    {% if color == 'green' %}bg-green-100 text-green-700
+    {% elif color == 'red' %}bg-red-100 text-red-700
+    {% elif color == 'yellow' %}bg-yellow-100 text-yellow-700
+    {% elif color == 'blue' %}bg-blue-100 text-blue-700
+    {% elif color == 'purple' %}bg-purple-100 text-purple-700
+    {% elif color == 'primary' %}bg-primary-100 text-primary-700
+    {% elif color == 'pink' %}bg-pink-100 text-pink-700
+    {% else %}bg-gray-100 text-gray-700{% endif %}">
+    {{ text }}
+</span>

@@ -1,0 +1,85 @@
+{% extends "base_exam.html" %}
+{% block title %}Exam - Question {{ current_question|default:"1" }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl">
+    <!-- Question Content Card -->
+    <div class="bg-exam-card border border-exam-border rounded-2xl p-6 md:p-8">
+        <!-- Question Instructions -->
+        <div class="space-y-4 mb-8">
+            <p class="text-sm text-exam-text leading-relaxed">
+                This question type is known as a multiple choice, select one. This question type contains multiple answer choices and has one correct answer.
+            </p>
+            <p class="text-sm text-exam-text leading-relaxed">
+                There are several varieties of this question type. The number of answer choices may vary, and questions may appear as part of a series or set.
+            </p>
+            <p class="text-sm text-exam-text leading-relaxed">
+                In this question type, you respond to the question by selecting the radio or option button next to your answer.
+            </p>
+        </div>
+
+        <!-- Separator -->
+        <div class="border-t border-exam-border my-6"></div>
+
+        <!-- Actual Question -->
+        <div class="mb-6">
+            <p class="text-sm text-exam-muted mb-3">Here is a sample question:</p>
+            <h3 class="text-base font-semibold text-exam-text mb-6">What is your favorite sound?</h3>
+        </div>
+
+        <!-- Answer Options -->
+        <div class="space-y-4 mb-8">
+            <!-- Option A -->
+            <label class="flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-exam-hover transition-smooth group">
+                <input type="radio" name="answer" value="A" class="w-5 h-5 border-2 border-exam-border text-exam-accent focus:ring-exam-accent focus:ring-offset-0 focus:ring-offset-exam-bg bg-transparent">
+                <span class="text-sm font-semibold text-exam-accent">A.</span>
+                <span class="text-sm text-exam-text">Bell</span>
+            </label>
+
+            <!-- Option B -->
+            <label class="flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-exam-hover transition-smooth group">
+                <input type="radio" name="answer" value="B" class="w-5 h-5 border-2 border-exam-border text-exam-accent focus:ring-exam-accent focus:ring-offset-0 focus:ring-offset-exam-bg bg-transparent">
+                <span class="text-sm font-semibold text-exam-accent">B.</span>
+                <span class="text-sm text-exam-text">Bird</span>
+            </label>
+
+            <!-- Option C -->
+            <label class="flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-exam-hover transition-smooth group">
+                <input type="radio" name="answer" value="C" class="w-5 h-5 border-2 border-exam-border text-exam-accent focus:ring-exam-accent focus:ring-offset-0 focus:ring-offset-exam-bg bg-transparent">
+                <span class="text-sm font-semibold text-exam-accent">C.</span>
+                <span class="text-sm text-exam-text">River</span>
+            </label>
+
+            <!-- Option D -->
+            <label class="flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-exam-hover transition-smooth group">
+                <input type="radio" name="answer" value="D" class="w-5 h-5 border-2 border-exam-border text-exam-accent focus:ring-exam-accent focus:ring-offset-0 focus:ring-offset-exam-bg bg-transparent">
+                <span class="text-sm font-semibold text-exam-accent">D.</span>
+                <span class="text-sm text-exam-text">Whistle</span>
+            </label>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-wrap items-center gap-4">
+            <!-- Reset Answer -->
+            <button class="flex items-center gap-2 px-4 py-2 border border-exam-accent text-exam-accent text-sm font-medium rounded-xl hover:bg-exam-accent/10 transition-smooth">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Reset Answer
+            </button>
+
+            <!-- Review Later -->
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="review_later" class="w-4 h-4 border-2 border-exam-border rounded text-exam-accent focus:ring-exam-accent bg-transparent">
+                <span class="text-sm text-exam-text">Review later</span>
+            </label>
+
+            <!-- Leave Feedback -->
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="leave_feedback" class="w-4 h-4 border-2 border-exam-border rounded text-exam-accent focus:ring-exam-accent bg-transparent">
+                <span class="text-sm text-exam-text">Leave Feedback</span>
+            </label>
+        </div>
+    </div>
+</div>
+{% endblock %}

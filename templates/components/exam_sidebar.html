@@ -1,0 +1,78 @@
+<!-- Exam Sidebar Component -->
+<aside id="exam-sidebar" class="fixed top-0 left-0 h-full w-[240px] bg-exam-sidebar z-40 flex flex-col border-r border-exam-border transition-smooth -translate-x-full lg:translate-x-0">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 py-4 border-b border-exam-border">
+        <h2 class="text-sm font-semibold text-exam-text">Exam Toolbar</h2>
+        <button class="p-1 rounded hover:bg-exam-hover transition-smooth">
+            <svg class="w-4 h-4 text-exam-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Navigation Items -->
+    <nav class="flex-1 py-4 space-y-1">
+        <!-- Exam Question Details -->
+        <button class="w-full flex items-center justify-between px-5 py-3 text-sm text-exam-text hover:bg-exam-hover transition-smooth">
+            <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-exam-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Exam Question Details</span>
+            </div>
+            <svg class="w-4 h-4 text-exam-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </button>
+
+        <!-- Exam Progress -->
+        <button class="w-full flex items-center justify-between px-5 py-3 text-sm text-exam-text hover:bg-exam-hover transition-smooth">
+            <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-exam-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                <span>Exam Progress</span>
+            </div>
+            <svg class="w-4 h-4 text-exam-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </button>
+
+        <!-- Take a Break -->
+        <button class="w-full flex items-center gap-3 px-5 py-3 text-sm text-exam-text hover:bg-exam-hover transition-smooth">
+            <svg class="w-5 h-5 text-exam-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span>Take a Break</span>
+        </button>
+
+        <!-- Calculator -->
+        <button class="w-full flex items-center gap-3 px-5 py-3 text-sm text-exam-text hover:bg-exam-hover transition-smooth">
+            <svg class="w-5 h-5 text-exam-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+            </svg>
+            <span>Calculator</span>
+        </button>
+
+        <!-- Color Scheme -->
+        <button class="w-full flex items-center justify-between px-5 py-3 text-sm text-exam-text hover:bg-exam-hover transition-smooth">
+            <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-exam-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+                </svg>
+                <span>Color Scheme</span>
+            </div>
+            <svg class="w-4 h-4 text-exam-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </button>
+
+        <!-- Help -->
+        <button class="w-full flex items-center gap-3 px-5 py-3 text-sm text-exam-text hover:bg-exam-hover transition-smooth">
+            <svg class="w-5 h-5 text-exam-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span>Help</span>
+        </button>
+    </nav>
+</aside>
