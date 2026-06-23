@@ -452,3 +452,51 @@ class CompleteRegistrationSerializer(serializers.Serializer):
     """
 
     registration_id = serializers.UUIDField()
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PHASE 7A — School Dashboard, Member Management & Staff Invite
+# ═════════════════════════════════════════════════════════════════════════════
+
+class SchoolMemberDetailSerializer(serializers.ModelSerializer):
+    """
+    Detailed membership record including user profile fields.
+    Used by the school admin member-management endpoints.
+    """
+
+    user_id = serializers.UUIDField(source='user.id', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
+    full_name = serializers.SerializerMethodField()
+    is_active = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = SchoolMembership
+        fields = [
+            'id', 'user_id', 'email', 'first_name', 'last_name', 'full_name',
+            'role', 'joined_at', 'is_active',
+        ]
+        read_only_fields = fields
+
+    def get_full_name(self, obj):
+        return obj.user.get_full_name() or obj.user.email
+
+
+class InviteStaffSerializer(serializers.Serializer):
+    """
+    Invite a teacher or admin to the school.
+    If the user already exists (by email) they are added directly;
+    otherwise a new user account is created with a temporary password.
+    """
+
+    email = serializers.EmailField()
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    role = serializers.ChoiceField(
+        choices=[
+            (SchoolMembership.SchoolRole.TEACHER, 'Teacher'),
+            (SchoolMembership.SchoolRole.SCHOOL_ADMIN, 'School Admin'),
+        ]
+    )
+    send_welcome_email = serializers.BooleanField(default=True)

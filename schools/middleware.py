@@ -34,6 +34,8 @@ class SchoolContextMiddleware:
         '/api/v1/auth/register/',
         '/api/v1/auth/login/',
         '/api/v1/auth/token/',
+        # Phase 7A — school registration is public (no school context yet)
+        '/api/v1/schools/register/',
     ]
 
     def _is_api_request(self, request):

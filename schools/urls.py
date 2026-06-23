@@ -81,4 +81,16 @@ urlpatterns = [
     path('register/<uuid:registration_id>/onboarding/step-3/', views.OnboardingStep3View.as_view(), name='onboarding_step3'),
     path('register/<uuid:registration_id>/onboarding/step-4/', views.OnboardingStep4View.as_view(), name='onboarding_step4'),
     path('register/<uuid:registration_id>/complete/', views.CompleteRegistrationView.as_view(), name='registration_complete'),
+
+    # ══ PHASE 7A — School Admin Dashboard ═════════════════════════════════════
+    # GET    /api/v1/schools/dashboard/   — aggregated school stats for admin
+    path('dashboard/', views.SchoolDashboardView.as_view(), name='school_dashboard'),
+
+    # ══ PHASE 7A — Member Management by Role ══════════════════════════════════
+    # GET    /api/v1/schools/members/students/  — list students
+    # GET    /api/v1/schools/members/teachers/  — list teachers + admins
+    # POST   /api/v1/schools/members/invite/    — invite staff via email
+    path('members/students/', views.SchoolStudentsListView.as_view(), name='member_students'),
+    path('members/teachers/', views.SchoolTeachersListView.as_view(), name='member_teachers'),
+    path('members/invite/', views.InviteStaffView.as_view(), name='invite_staff'),
 ]

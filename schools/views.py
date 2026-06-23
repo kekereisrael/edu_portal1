@@ -1277,3 +1277,211 @@ class CompleteRegistrationView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PHASE 7A — School Admin Dashboard
+# ═════════════════════════════════════════════════════════════════════════════
+
+from core.services.dashboard_service import get_school_admin_dashboard_data
+from core.permissions import IsSchoolMember
+from .serializers import SchoolMemberDetailSerializer, InviteStaffSerializer
+
+
+class SchoolDashboardView(APIView):
+    """
+    GET /api/v1/schools/dashboard/
+    Returns aggregated school-wide statistics for the school admin.
+
+    Requires:
+      - IsAuthenticated
+      - HasSchoolContext  (X-School-ID header or single membership)
+      - IsSchoolAdmin
+    """
+
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get(self, request):
+        data = get_school_admin_dashboard_data(request.school)
+        return Response(data)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PHASE 7A — Member Management by Role
+# ═════════════════════════════════════════════════════════════════════════════
+
+class SchoolStudentsListView(generics.ListAPIView):
+    """
+    GET /api/v1/schools/members/students/
+    List all active students in the current school.
+    Supports ?search=<name|email> query param.
+    """
+
+    serializer_class = SchoolMemberDetailSerializer
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get_queryset(self):
+        qs = SchoolMembership.objects.filter(
+            school=self.request.school,
+            role=SchoolMembership.SchoolRole.STUDENT,
+            is_active=True,
+        ).select_related('user').order_by('user__last_name', 'user__first_name')
+
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            from django.db.models import Q as DQ
+            qs = qs.filter(
+                DQ(user__first_name__icontains=search) |
+                DQ(user__last_name__icontains=search) |
+                DQ(user__email__icontains=search)
+            )
+        return qs
+
+
+class SchoolTeachersListView(generics.ListAPIView):
+    """
+    GET /api/v1/schools/members/teachers/
+    List all active teachers (and school admins) in the current school.
+    Supports ?search=<name|email> query param.
+    """
+
+    serializer_class = SchoolMemberDetailSerializer
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get_queryset(self):
+        qs = SchoolMembership.objects.filter(
+            school=self.request.school,
+            role__in=[
+                SchoolMembership.SchoolRole.TEACHER,
+                SchoolMembership.SchoolRole.SCHOOL_ADMIN,
+            ],
+            is_active=True,
+        ).select_related('user').order_by('user__last_name', 'user__first_name')
+
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            from django.db.models import Q as DQ
+            qs = qs.filter(
+                DQ(user__first_name__icontains=search) |
+                DQ(user__last_name__icontains=search) |
+                DQ(user__email__icontains=search)
+            )
+        return qs
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PHASE 7A — Invite Staff via Email
+# ═════════════════════════════════════════════════════════════════════════════
+
+class InviteStaffView(APIView):
+    """
+    POST /api/v1/schools/members/invite/
+    Invite a teacher or school admin to the current school.
+
+    If the user already exists (matched by email) they are added directly.
+    If not, a new User account is created with a random temporary password
+    and the user is notified by email.
+
+    Body:
+      {
+        "email": "teacher@example.com",
+        "first_name": "Ada",
+        "last_name": "Lovelace",
+        "role": "teacher",          // or "school_admin"
+        "send_welcome_email": true
+      }
+    """
+
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def post(self, request):
+        import secrets as _secrets
+        from django.core.mail import send_mail
+        from django.conf import settings as django_settings
+
+        serializer = InviteStaffSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        email = data['email'].lower()
+        role = data['role']
+        school = request.school
+
+        # ── Check for duplicate active membership ────────────────────────────
+        if SchoolMembership.objects.filter(
+            school=school,
+            user__email=email,
+            is_active=True,
+        ).exists():
+            return Response(
+                {'detail': f'A member with email {email} already belongs to this school.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        # ── Get or create the user ───────────────────────────────────────────
+        created_user = False
+        temp_password = None
+        try:
+            user = UserModel.objects.get(email=email)
+        except UserModel.DoesNotExist:
+            temp_password = _secrets.token_urlsafe(12)
+            user = UserModel.objects.create_user(
+                email=email,
+                password=temp_password,
+                first_name=data['first_name'],
+                last_name=data['last_name'],
+            )
+            created_user = True
+
+        # ── Create membership ────────────────────────────────────────────────
+        membership, _ = SchoolMembership.objects.get_or_create(
+            school=school,
+            user=user,
+            defaults={'role': role, 'is_active': True},
+        )
+        # If membership existed but was inactive, reactivate it
+        if not membership.is_active or membership.role != role:
+            membership.role = role
+            membership.is_active = True
+            membership.save(update_fields=['role', 'is_active'])
+
+        # ── Send welcome / invite email ──────────────────────────────────────
+        if data.get('send_welcome_email', True):
+            try:
+                subject = f"You've been invited to {school.name} on Examind"
+                if created_user:
+                    body = (
+                        f"Hello {user.first_name or email},\n\n"
+                        f"You have been invited to join {school.name} as a {role.replace('_', ' ').title()}.\n\n"
+                        f"Your temporary login credentials:\n"
+                        f"  Email:    {email}\n"
+                        f"  Password: {temp_password}\n\n"
+                        f"Please log in and change your password immediately.\n\n"
+                        f"— The Examind Team"
+                    )
+                else:
+                    body = (
+                        f"Hello {user.first_name or email},\n\n"
+                        f"You have been added to {school.name} as a {role.replace('_', ' ').title()} on Examind.\n\n"
+                        f"Log in with your existing credentials to access the school.\n\n"
+                        f"— The Examind Team"
+                    )
+                send_mail(
+                    subject=subject,
+                    message=body,
+                    from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@examind.ng'),
+                    recipient_list=[email],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass  # Email failure must not block the response
+
+        return Response(
+            {
+                'message': f'{"Created and invited" if created_user else "Invited"} {email} as {role}.',
+                'membership_id': str(membership.id),
+                'user_created': created_user,
+                'role': role,
+            },
+            status=status.HTTP_201_CREATED,
+        )

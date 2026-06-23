@@ -81,3 +81,35 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
         if hasattr(obj, 'uploaded_by'):
             return obj.uploaded_by == request.user
         return False
+
+
+class IsSchoolMember(permissions.BasePermission):
+    """
+    Object-level permission: the object must belong to the same school as
+    the current request context.
+
+    Works for any model that has a `school` FK/O2O field, or that exposes
+    a `school` property (e.g. Term → academic_year.school).
+    """
+
+    message = 'You do not have permission to access this resource in your school.'
+
+    def has_permission(self, request, view):
+        # Require an active school context
+        return hasattr(request, 'school') and request.school is not None
+
+    def has_object_permission(self, request, view, obj):
+        if not hasattr(request, 'school') or request.school is None:
+            return False
+        # Resolve the school from the object
+        obj_school = None
+        if hasattr(obj, 'school_id'):
+            obj_school = obj.school_id
+        elif hasattr(obj, 'school'):
+            try:
+                obj_school = obj.school.id if obj.school else None
+            except Exception:
+                return False
+        if obj_school is None:
+            return False
+        return str(obj_school) == str(request.school.id)
