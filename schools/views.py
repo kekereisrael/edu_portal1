@@ -1485,3 +1485,528 @@ class InviteStaffView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PHASE 7A — Teacher Management (CRUD + assign subjects/classes)
+# ═════════════════════════════════════════════════════════════════════════════
+
+from .serializers import (
+    TeacherProfileSerializer,
+    CreateTeacherSerializer,
+    UpdateTeacherSerializer,
+    StudentProfileSerializer,
+    CreateStudentSerializer,
+    UpdateStudentSerializer,
+    BulkStudentUploadSerializer,
+)
+
+
+class TeacherListCreateView(APIView):
+    """
+    GET  /api/v1/schools/teachers/        — list all teachers in the school
+    POST /api/v1/schools/teachers/        — create / invite a teacher
+    """
+
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get(self, request):
+        search = request.query_params.get('search', '').strip()
+        qs = SchoolMembership.objects.filter(
+            school=request.school,
+            role__in=[
+                SchoolMembership.SchoolRole.TEACHER,
+                SchoolMembership.SchoolRole.SCHOOL_ADMIN,
+            ],
+            is_active=True,
+        ).select_related('user').order_by('user__last_name', 'user__first_name')
+
+        if search:
+            from django.db.models import Q as DQ
+            qs = qs.filter(
+                DQ(user__first_name__icontains=search) |
+                DQ(user__last_name__icontains=search) |
+                DQ(user__email__icontains=search)
+            )
+
+        serializer = TeacherProfileSerializer(qs, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    def post(self, request):
+        import secrets as _secrets
+        from django.core.mail import send_mail
+        from django.conf import settings as django_settings
+
+        serializer = CreateTeacherSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        email = data['email'].lower()
+        school = request.school
+
+        # Check duplicate active membership
+        if SchoolMembership.objects.filter(
+            school=school, user__email=email, is_active=True,
+        ).exists():
+            return Response(
+                {'detail': f'A member with email {email} already belongs to this school.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        created_user = False
+        temp_password = None
+        try:
+            user = UserModel.objects.get(email=email)
+        except UserModel.DoesNotExist:
+            temp_password = _secrets.token_urlsafe(12)
+            user = UserModel.objects.create_user(
+                email=email,
+                password=temp_password,
+                first_name=data['first_name'],
+                last_name=data['last_name'],
+                phone=data.get('phone', ''),
+                role=User.Role.TEACHER,
+                is_active=True,
+            )
+            created_user = True
+
+        membership, _ = SchoolMembership.objects.get_or_create(
+            school=school,
+            user=user,
+            defaults={'role': SchoolMembership.SchoolRole.TEACHER, 'is_active': True},
+        )
+        if not membership.is_active or membership.role != SchoolMembership.SchoolRole.TEACHER:
+            membership.role = SchoolMembership.SchoolRole.TEACHER
+            membership.is_active = True
+            membership.save(update_fields=['role', 'is_active'])
+
+        if data.get('send_welcome_email', True):
+            try:
+                subject = f"You've been added as a teacher at {school.name} — Examind"
+                if created_user:
+                    body = (
+                        f"Hello {user.first_name or email},\n\n"
+                        f"You have been added as a teacher at {school.name} on Examind.\n\n"
+                        f"Your login credentials:\n"
+                        f"  Email:    {email}\n"
+                        f"  Password: {temp_password}\n\n"
+                        f"Please log in and change your password immediately.\n\n"
+                        f"— The Examind Team"
+                    )
+                else:
+                    body = (
+                        f"Hello {user.first_name or email},\n\n"
+                        f"You have been added as a teacher at {school.name} on Examind.\n\n"
+                        f"Log in with your existing credentials.\n\n"
+                        f"— The Examind Team"
+                    )
+                send_mail(
+                    subject=subject,
+                    message=body,
+                    from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@examind.ng'),
+                    recipient_list=[email],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass
+
+        membership.refresh_from_db()
+        return Response(
+            TeacherProfileSerializer(membership, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class TeacherDetailView(APIView):
+    """
+    GET    /api/v1/schools/teachers/<membership_id>/  — get teacher details
+    PATCH  /api/v1/schools/teachers/<membership_id>/  — update teacher info
+    DELETE /api/v1/schools/teachers/<membership_id>/  — deactivate teacher
+    """
+
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def _get_membership(self, request, membership_id):
+        return get_object_or_404(
+            SchoolMembership,
+            id=membership_id,
+            school=request.school,
+            role__in=[SchoolMembership.SchoolRole.TEACHER, SchoolMembership.SchoolRole.SCHOOL_ADMIN],
+        )
+
+    def get(self, request, membership_id):
+        membership = self._get_membership(request, membership_id)
+        return Response(TeacherProfileSerializer(membership, context={'request': request}).data)
+
+    def patch(self, request, membership_id):
+        membership = self._get_membership(request, membership_id)
+        serializer = UpdateTeacherSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        user = membership.user
+        update_fields = []
+        for field in ['first_name', 'last_name', 'phone']:
+            if field in data:
+                setattr(user, field, data[field])
+                update_fields.append(field)
+        if update_fields:
+            user.save(update_fields=update_fields)
+
+        membership.refresh_from_db()
+        return Response(TeacherProfileSerializer(membership, context={'request': request}).data)
+
+    def delete(self, request, membership_id):
+        membership = self._get_membership(request, membership_id)
+        if membership.user == request.school.owner:
+            return Response(
+                {'detail': 'Cannot deactivate the school owner.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        membership.is_active = False
+        membership.save(update_fields=['is_active'])
+        return Response({'message': 'Teacher deactivated successfully.'}, status=status.HTTP_200_OK)
+
+
+class TeacherAssignSubjectView(APIView):
+    """
+    POST /api/v1/schools/teachers/<membership_id>/assign-subject/
+    Assign a subject + classroom + term to a teacher.
+    Body: { "subject_id", "classroom_id", "term_id", "is_primary" }
+    """
+
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def post(self, request, membership_id):
+        from subjects.models import Subject, SubjectTeacherAssignment
+        from subjects.serializers import SubjectTeacherAssignmentSerializer
+
+        membership = get_object_or_404(
+            SchoolMembership,
+            id=membership_id,
+            school=request.school,
+            role__in=[SchoolMembership.SchoolRole.TEACHER, SchoolMembership.SchoolRole.SCHOOL_ADMIN],
+            is_active=True,
+        )
+
+        subject_id  = request.data.get('subject_id')
+        classroom_id = request.data.get('classroom_id')
+        term_id     = request.data.get('term_id')
+        is_primary  = request.data.get('is_primary', True)
+
+        if not all([subject_id, classroom_id, term_id]):
+            return Response(
+                {'detail': 'subject_id, classroom_id, and term_id are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        subject   = get_object_or_404(Subject, id=subject_id, school=request.school)
+        classroom = get_object_or_404(ClassRoom, id=classroom_id, school=request.school)
+        term      = get_object_or_404(Term, id=term_id, academic_year__school=request.school)
+
+        assignment, created = SubjectTeacherAssignment.objects.get_or_create(
+            subject=subject,
+            teacher=membership.user,
+            classroom=classroom,
+            term=term,
+            defaults={'is_primary': is_primary},
+        )
+
+        if not created:
+            return Response(
+                {'detail': 'Teacher is already assigned to this subject/classroom/term.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            SubjectTeacherAssignmentSerializer(assignment).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class TeacherRemoveSubjectView(APIView):
+    """
+    DELETE /api/v1/schools/teachers/<membership_id>/remove-subject/
+    Remove a subject assignment from a teacher.
+    Body: { "subject_id", "classroom_id", "term_id" }
+    """
+
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def delete(self, request, membership_id):
+        from subjects.models import SubjectTeacherAssignment
+
+        membership = get_object_or_404(
+            SchoolMembership,
+            id=membership_id,
+            school=request.school,
+            is_active=True,
+        )
+
+        subject_id   = request.data.get('subject_id')
+        classroom_id = request.data.get('classroom_id')
+        term_id      = request.data.get('term_id')
+
+        qs = SubjectTeacherAssignment.objects.filter(
+            teacher=membership.user,
+            subject__school=request.school,
+        )
+        if subject_id:
+            qs = qs.filter(subject_id=subject_id)
+        if classroom_id:
+            qs = qs.filter(classroom_id=classroom_id)
+        if term_id:
+            qs = qs.filter(term_id=term_id)
+
+        deleted, _ = qs.delete()
+        return Response(
+            {'message': f'{deleted} assignment(s) removed.'},
+            status=status.HTTP_200_OK,
+        )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PHASE 7A — Student Management (CRUD + bulk upload + profile)
+# ═════════════════════════════════════════════════════════════════════════════
+
+class StudentListCreateView(APIView):
+    """
+    GET  /api/v1/schools/students/  — list all students
+    POST /api/v1/schools/students/  — create a new student
+    """
+
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get(self, request):
+        search = request.query_params.get('search', '').strip()
+        qs = SchoolMembership.objects.filter(
+            school=request.school,
+            role=SchoolMembership.SchoolRole.STUDENT,
+            is_active=True,
+        ).select_related('user').order_by('user__last_name', 'user__first_name')
+
+        if search:
+            from django.db.models import Q as DQ
+            qs = qs.filter(
+                DQ(user__first_name__icontains=search) |
+                DQ(user__last_name__icontains=search) |
+                DQ(user__email__icontains=search)
+            )
+
+        serializer = StudentProfileSerializer(qs, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    def post(self, request):
+        import secrets as _secrets
+        from accounts.models import StudentProfile
+
+        serializer = CreateStudentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        email  = data['email'].lower()
+        school = request.school
+
+        # Check duplicate active membership
+        if SchoolMembership.objects.filter(
+            school=school, user__email=email, is_active=True,
+        ).exists():
+            return Response(
+                {'detail': f'A member with email {email} already belongs to this school.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        from django.db import transaction as db_transaction
+        with db_transaction.atomic():
+            created_user = False
+            try:
+                user = UserModel.objects.get(email=email)
+            except UserModel.DoesNotExist:
+                temp_password = _secrets.token_urlsafe(12)
+                user = UserModel.objects.create_user(
+                    email=email,
+                    password=temp_password,
+                    first_name=data['first_name'],
+                    last_name=data['last_name'],
+                    phone=data.get('phone', ''),
+                    role=User.Role.STUDENT,
+                    is_active=True,
+                )
+                created_user = True
+
+            membership, _ = SchoolMembership.objects.get_or_create(
+                school=school,
+                user=user,
+                defaults={'role': SchoolMembership.SchoolRole.STUDENT, 'is_active': True},
+            )
+            if not membership.is_active:
+                membership.is_active = True
+                membership.save(update_fields=['is_active'])
+
+            # Create or update StudentProfile
+            profile_data = {
+                'admission_number': data.get('admission_number', ''),
+                'date_of_birth': data.get('date_of_birth'),
+                'gender': data.get('gender', ''),
+                'guardian_name': data.get('guardian_name', ''),
+                'guardian_phone': data.get('guardian_phone', ''),
+                'guardian_email': data.get('guardian_email', ''),
+                'guardian_relationship': data.get('guardian_relationship', ''),
+            }
+            profile_data = {k: v for k, v in profile_data.items() if v is not None}
+            StudentProfile.objects.update_or_create(
+                user=user,
+                school=school,
+                defaults=profile_data,
+            )
+
+        membership.refresh_from_db()
+        return Response(
+            StudentProfileSerializer(membership, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class StudentDetailView(APIView):
+    """
+    GET    /api/v1/schools/students/<membership_id>/  — get student details
+    PATCH  /api/v1/schools/students/<membership_id>/  — update student info
+    DELETE /api/v1/schools/students/<membership_id>/  — deactivate student
+    """
+
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def _get_membership(self, request, membership_id):
+        return get_object_or_404(
+            SchoolMembership,
+            id=membership_id,
+            school=request.school,
+            role=SchoolMembership.SchoolRole.STUDENT,
+        )
+
+    def get(self, request, membership_id):
+        membership = self._get_membership(request, membership_id)
+        return Response(StudentProfileSerializer(membership, context={'request': request}).data)
+
+    def patch(self, request, membership_id):
+        from accounts.models import StudentProfile
+
+        membership = self._get_membership(request, membership_id)
+        serializer = UpdateStudentSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        user = membership.user
+        user_fields = ['first_name', 'last_name', 'phone']
+        user_update = [f for f in user_fields if f in data]
+        if user_update:
+            for f in user_update:
+                setattr(user, f, data[f])
+            user.save(update_fields=user_update)
+
+        profile_fields = [
+            'admission_number', 'date_of_birth', 'gender',
+            'guardian_name', 'guardian_phone', 'guardian_email', 'guardian_relationship',
+        ]
+        profile_data = {k: data[k] for k in profile_fields if k in data}
+        if profile_data:
+            StudentProfile.objects.update_or_create(
+                user=user,
+                school=request.school,
+                defaults=profile_data,
+            )
+
+        membership.refresh_from_db()
+        return Response(StudentProfileSerializer(membership, context={'request': request}).data)
+
+    def delete(self, request, membership_id):
+        membership = self._get_membership(request, membership_id)
+        membership.is_active = False
+        membership.save(update_fields=['is_active'])
+        return Response({'message': 'Student deactivated successfully.'}, status=status.HTTP_200_OK)
+
+
+class StudentBulkUploadView(APIView):
+    """
+    POST /api/v1/schools/students/bulk-upload/
+    Bulk create students from a JSON list.
+    Body: { "students": [{ "email", "first_name", "last_name", ... }, ...] }
+    Returns: { "created": [...], "skipped": [...], "errors": [...] }
+    """
+
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def post(self, request):
+        import secrets as _secrets
+        from accounts.models import StudentProfile
+        from django.db import transaction as db_transaction
+
+        serializer = BulkStudentUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        students_data = serializer.validated_data['students']
+
+        school = request.school
+        results = {'created': [], 'skipped': [], 'errors': []}
+
+        for idx, student_data in enumerate(students_data):
+            email = (student_data.get('email') or '').lower().strip()
+            if not email:
+                results['errors'].append({'index': idx, 'reason': 'Email is required.'})
+                continue
+
+            first_name = student_data.get('first_name', '').strip()
+            last_name  = student_data.get('last_name', '').strip()
+            if not first_name or not last_name:
+                results['errors'].append({'index': idx, 'email': email, 'reason': 'first_name and last_name are required.'})
+                continue
+
+            try:
+                with db_transaction.atomic():
+                    if SchoolMembership.objects.filter(
+                        school=school, user__email=email, is_active=True,
+                    ).exists():
+                        results['skipped'].append({'email': email, 'reason': 'Already a member.'})
+                        continue
+
+                    try:
+                        user = UserModel.objects.get(email=email)
+                    except UserModel.DoesNotExist:
+                        temp_password = _secrets.token_urlsafe(12)
+                        user = UserModel.objects.create_user(
+                            email=email,
+                            password=temp_password,
+                            first_name=first_name,
+                            last_name=last_name,
+                            phone=student_data.get('phone', ''),
+                            role=User.Role.STUDENT,
+                            is_active=True,
+                        )
+
+                    membership, _ = SchoolMembership.objects.get_or_create(
+                        school=school,
+                        user=user,
+                        defaults={'role': SchoolMembership.SchoolRole.STUDENT, 'is_active': True},
+                    )
+                    if not membership.is_active:
+                        membership.is_active = True
+                        membership.save(update_fields=['is_active'])
+
+                    profile_data = {
+                        k: student_data[k]
+                        for k in [
+                            'admission_number', 'date_of_birth', 'gender',
+                            'guardian_name', 'guardian_phone', 'guardian_email',
+                            'guardian_relationship',
+                        ]
+                        if k in student_data and student_data[k]
+                    }
+                    StudentProfile.objects.update_or_create(
+                        user=user, school=school, defaults=profile_data,
+                    )
+
+                    results['created'].append({'email': email, 'user_id': str(user.id)})
+
+            except Exception as exc:
+                results['errors'].append({'index': idx, 'email': email, 'reason': str(exc)})
+
+        return Response(results, status=status.HTTP_201_CREATED)

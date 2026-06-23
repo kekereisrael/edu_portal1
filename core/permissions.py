@@ -83,6 +83,28 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
         return False
 
 
+class IsParent(permissions.BasePermission):
+    """Ensure user is a parent in the current school."""
+
+    message = 'You must be a parent to perform this action.'
+
+    def has_permission(self, request, view):
+        if not hasattr(request, 'school_membership') or request.school_membership is None:
+            return False
+        return request.school_membership.role == 'parent'
+
+
+class IsSchoolAdminOrParent(permissions.BasePermission):
+    """Ensure user is either a school admin or a parent."""
+
+    message = 'You must be a school admin or parent to perform this action.'
+
+    def has_permission(self, request, view):
+        if not hasattr(request, 'school_membership') or request.school_membership is None:
+            return False
+        return request.school_membership.role in ['school_admin', 'parent']
+
+
 class IsSchoolMember(permissions.BasePermission):
     """
     Object-level permission: the object must belong to the same school as

@@ -13,9 +13,20 @@ from django.utils.text import slugify
 class School(models.Model):
     """School/tenant model for multi-tenancy."""
 
+    class SchoolType(models.TextChoices):
+        SECONDARY_SCHOOL = 'secondary_school', 'Secondary School'
+        TUTORIAL_CENTER  = 'tutorial_center',  'Tutorial Center'
+        CBT_CENTER       = 'cbt_center',       'CBT Center'
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True, db_index=True)
+    school_type = models.CharField(
+        max_length=30,
+        choices=SchoolType.choices,
+        default=SchoolType.SECONDARY_SCHOOL,
+        db_index=True,
+    )
     email = models.EmailField()
     phone = models.CharField(max_length=20, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
@@ -23,6 +34,9 @@ class School(models.Model):
     state = models.CharField(max_length=100, blank=True, null=True)
     country = models.CharField(max_length=100, default='Nigeria')
     logo = models.ImageField(upload_to='schools/logos/', blank=True, null=True)
+    # Branding colours (hex codes, e.g. "#1A73E8")
+    primary_color   = models.CharField(max_length=10, blank=True, default='#1A73E8')
+    secondary_color = models.CharField(max_length=10, blank=True, default='#FFFFFF')
     website = models.URLField(blank=True, null=True)
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -743,4 +757,82 @@ class SchoolVerificationToken(models.Model):
         return cls.objects.create(
             registration=registration,
             expires_at=timezone.now() + timezone.timedelta(hours=48),
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PHASE 7B — PARENT PORTAL
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ParentStudentLink(models.Model):
+    """
+    Links a parent user to one or more student users within the same school.
+
+    A parent must already be a SchoolMembership(role='parent') for the school.
+    The student must be a SchoolMembership(role='student') for the same school.
+
+    Relationship is school-scoped so data isolation is preserved.
+    """
+
+    class Status(models.TextChoices):
+        PENDING  = 'pending',  'Pending Approval'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey(
+        School,
+        on_delete=models.CASCADE,
+        related_name='parent_student_links',
+        db_index=True,
+    )
+    parent = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='linked_children',
+        db_index=True,
+    )
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='linked_parents',
+        db_index=True,
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    relationship = models.CharField(
+        max_length=50,
+        blank=True,
+        default='parent',
+        help_text='e.g. Father, Mother, Guardian',
+    )
+    linked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='parent_links_created',
+        help_text='School admin who created this link',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'parent-student link'
+        verbose_name_plural = 'parent-student links'
+        unique_together = ['school', 'parent', 'student']
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['school', 'parent', 'status'], name='idx_psl_school_parent'),
+            models.Index(fields=['school', 'student', 'status'], name='idx_psl_school_student'),
+        ]
+
+    def __str__(self):
+        return (
+            f'{self.parent.email} → {self.student.email} '
+            f'({self.school.name}, {self.status})'
         )

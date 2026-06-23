@@ -1,6 +1,6 @@
 """
 Dashboard service layer.
-Handles all business logic for the student/teacher/school-admin dashboard.
+Handles all business logic for the student/teacher/school-admin/parent dashboard.
 """
 
 import logging
@@ -300,5 +300,161 @@ def get_school_admin_dashboard_data(school):
                 'recent_attempts_30d': 0, 'average_score': 0,
             },
             'recent_activity': [],
+            'error': 'Unable to load dashboard data. Please try again later.',
+        }
+
+
+def get_parent_dashboard_data(parent_user, school):
+    """
+    Get aggregated dashboard data for a parent user for a specific child.
+
+    Args:
+        parent_user: The authenticated User instance (role=parent)
+        school:      The School instance (from request.school)
+
+    Returns:
+        dict: Per-child summaries including recent exams, avg score,
+              weak subjects, recommendations, and upcoming exams.
+    """
+    try:
+        from schools.models import ParentStudentLink
+        from exams.models import ExamAttempt, Exam
+
+        # ── Fetch approved children for this parent in this school ───────────
+        links = ParentStudentLink.objects.filter(
+            school=school,
+            parent=parent_user,
+            status=ParentStudentLink.Status.APPROVED,
+        ).select_related('student')
+
+        children_data = []
+
+        for link in links:
+            student = link.student
+
+            # Recent graded attempts (last 10)
+            recent_attempts = (
+                ExamAttempt.objects
+                .filter(
+                    student=student,
+                    exam__school=school,
+                    status=ExamAttempt.Status.GRADED,
+                )
+                .select_related('exam', 'exam__subject')
+                .order_by('-submitted_at')[:10]
+            )
+
+            recent_exams = [
+                {
+                    'exam_title': a.exam.title,
+                    'subject': a.exam.subject.name if a.exam.subject else 'N/A',
+                    'score': float(a.score) if a.score is not None else None,
+                    'percentage': float(a.percentage) if a.percentage is not None else None,
+                    'passed': a.passed,
+                    'submitted_at': a.submitted_at,
+                }
+                for a in recent_attempts
+            ]
+
+            # Average score overall
+            avg_result = ExamAttempt.objects.filter(
+                student=student,
+                exam__school=school,
+                status=ExamAttempt.Status.GRADED,
+                percentage__isnull=False,
+            ).aggregate(avg=Avg('percentage'))
+            avg_score = round(float(avg_result['avg']), 1) if avg_result['avg'] else 0
+
+            # Subject-level averages → identify weak subjects (avg < 50%)
+            subject_avgs = (
+                ExamAttempt.objects
+                .filter(
+                    student=student,
+                    exam__school=school,
+                    status=ExamAttempt.Status.GRADED,
+                    percentage__isnull=False,
+                )
+                .values('exam__subject__name', 'exam__subject__id')
+                .annotate(avg_pct=Avg('percentage'), attempt_count=Count('id'))
+                .order_by('avg_pct')
+            )
+
+            weak_subjects = []
+            all_subjects = []
+            for row in subject_avgs:
+                entry = {
+                    'subject': row['exam__subject__name'] or 'Unknown',
+                    'average_score': round(float(row['avg_pct']), 1),
+                    'attempt_count': row['attempt_count'],
+                }
+                all_subjects.append(entry)
+                if row['avg_pct'] < 50:
+                    weak_subjects.append(entry)
+
+            # Recommendations based on weak subjects
+            recommendations = []
+            for ws in weak_subjects[:3]:
+                recommendations.append(
+                    f"Focus on {ws['subject']} — current average is "
+                    f"{ws['average_score']}%. Consider extra practice or tutoring."
+                )
+            if avg_score >= 70 and not weak_subjects:
+                recommendations.append(
+                    f"{student.first_name or 'Your child'} is performing well overall. "
+                    "Keep up the great work!"
+                )
+
+            # Upcoming exams for this school
+            upcoming = (
+                Exam.objects
+                .filter(
+                    school=school,
+                    status='published',
+                    start_date__gt=timezone.now(),
+                )
+                .select_related('subject')
+                .order_by('start_date')[:5]
+            )
+            upcoming_exams = [
+                {
+                    'title': e.title,
+                    'subject': e.subject.name if e.subject else 'N/A',
+                    'start_date': e.start_date,
+                    'duration_minutes': e.duration_minutes,
+                }
+                for e in upcoming
+            ]
+
+            children_data.append({
+                'student_id': str(student.id),
+                'student_name': student.get_full_name() or student.email,
+                'relationship': link.relationship,
+                'average_score': avg_score,
+                'recent_exams': recent_exams,
+                'subject_performance': all_subjects,
+                'weak_subjects': weak_subjects,
+                'recommendations': recommendations,
+                'upcoming_exams': upcoming_exams,
+            })
+
+        return {
+            'parent_id': str(parent_user.id),
+            'parent_name': parent_user.get_full_name() or parent_user.email,
+            'school_name': school.name,
+            'children': children_data,
+            'children_count': len(children_data),
+        }
+
+    except Exception as exc:
+        logger.error(
+            f"Error fetching parent dashboard data for user {parent_user} "
+            f"in school {school}: {exc}"
+        )
+        return {
+            'parent_id': str(parent_user.id),
+            'parent_name': parent_user.get_full_name() or parent_user.email,
+            'school_name': getattr(school, 'name', ''),
+            'children': [],
+            'children_count': 0,
             'error': 'Unable to load dashboard data. Please try again later.',
         }

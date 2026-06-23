@@ -455,6 +455,234 @@ class CompleteRegistrationSerializer(serializers.Serializer):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+# PHASE 7A — Teacher Management
+# ═════════════════════════════════════════════════════════════════════════════
+
+class TeacherProfileSerializer(serializers.ModelSerializer):
+    """
+    Detailed teacher record for the school admin teacher-management views.
+    Includes user fields + membership info + assigned subjects/classes.
+    """
+
+    user_id       = serializers.UUIDField(source='user.id', read_only=True)
+    email         = serializers.EmailField(source='user.email', read_only=True)
+    first_name    = serializers.CharField(source='user.first_name', read_only=True)
+    last_name     = serializers.CharField(source='user.last_name', read_only=True)
+    full_name     = serializers.SerializerMethodField()
+    phone         = serializers.CharField(source='user.phone', read_only=True, default=None)
+    avatar        = serializers.ImageField(source='user.avatar', read_only=True, default=None)
+    assigned_subjects = serializers.SerializerMethodField()
+    assigned_classrooms = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SchoolMembership
+        fields = [
+            'id', 'user_id', 'email', 'first_name', 'last_name', 'full_name',
+            'phone', 'avatar', 'role', 'joined_at', 'is_active',
+            'assigned_subjects', 'assigned_classrooms',
+        ]
+        read_only_fields = fields
+
+    def get_full_name(self, obj):
+        return obj.user.get_full_name() or obj.user.email
+
+    def get_assigned_subjects(self, obj):
+        """Return subjects this teacher is assigned to in the current school."""
+        try:
+            from subjects.models import SubjectTeacherAssignment
+            assignments = SubjectTeacherAssignment.objects.filter(
+                teacher=obj.user,
+                subject__school=obj.school,
+            ).select_related('subject').distinct('subject')
+            return [
+                {'id': str(a.subject.id), 'name': a.subject.name, 'code': a.subject.code}
+                for a in assignments
+            ]
+        except Exception:
+            return []
+
+    def get_assigned_classrooms(self, obj):
+        """Return classrooms where this teacher is the class teacher."""
+        classrooms = ClassRoom.objects.filter(
+            school=obj.school,
+            class_teacher=obj.user,
+            is_active=True,
+        )
+        return [{'id': str(c.id), 'name': c.name} for c in classrooms]
+
+
+class CreateTeacherSerializer(serializers.Serializer):
+    """Create or invite a teacher to the school."""
+
+    email      = serializers.EmailField()
+    first_name = serializers.CharField(max_length=100)
+    last_name  = serializers.CharField(max_length=100)
+    phone      = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    send_welcome_email = serializers.BooleanField(default=True)
+
+
+class UpdateTeacherSerializer(serializers.Serializer):
+    """Update a teacher's basic info (name, phone)."""
+
+    first_name = serializers.CharField(max_length=100, required=False)
+    last_name  = serializers.CharField(max_length=100, required=False)
+    phone      = serializers.CharField(max_length=20, required=False, allow_blank=True)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# PHASE 7A — Student Management
+# ═════════════════════════════════════════════════════════════════════════════
+
+class StudentProfileSerializer(serializers.ModelSerializer):
+    """
+    Detailed student record for the school admin student-management views.
+    Includes user fields + StudentProfile + current class assignment.
+    """
+
+    user_id       = serializers.UUIDField(source='user.id', read_only=True)
+    email         = serializers.EmailField(source='user.email', read_only=True)
+    first_name    = serializers.CharField(source='user.first_name', read_only=True)
+    last_name     = serializers.CharField(source='user.last_name', read_only=True)
+    full_name     = serializers.SerializerMethodField()
+    phone         = serializers.CharField(source='user.phone', read_only=True, default=None)
+    avatar        = serializers.ImageField(source='user.avatar', read_only=True, default=None)
+    admission_number   = serializers.SerializerMethodField()
+    date_of_birth      = serializers.SerializerMethodField()
+    gender             = serializers.SerializerMethodField()
+    guardian_name      = serializers.SerializerMethodField()
+    guardian_phone     = serializers.SerializerMethodField()
+    guardian_email     = serializers.SerializerMethodField()
+    guardian_relationship = serializers.SerializerMethodField()
+    current_class      = serializers.SerializerMethodField()
+    profile_picture    = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SchoolMembership
+        fields = [
+            'id', 'user_id', 'email', 'first_name', 'last_name', 'full_name',
+            'phone', 'avatar', 'profile_picture',
+            'admission_number', 'date_of_birth', 'gender',
+            'guardian_name', 'guardian_phone', 'guardian_email', 'guardian_relationship',
+            'current_class', 'role', 'joined_at', 'is_active',
+        ]
+        read_only_fields = fields
+
+    def get_full_name(self, obj):
+        return obj.user.get_full_name() or obj.user.email
+
+    def _get_student_profile(self, obj):
+        try:
+            from accounts.models import StudentProfile
+            return StudentProfile.objects.get(user=obj.user, school=obj.school)
+        except Exception:
+            return None
+
+    def get_admission_number(self, obj):
+        sp = self._get_student_profile(obj)
+        return sp.admission_number if sp else None
+
+    def get_date_of_birth(self, obj):
+        sp = self._get_student_profile(obj)
+        return sp.date_of_birth.isoformat() if sp and sp.date_of_birth else None
+
+    def get_gender(self, obj):
+        sp = self._get_student_profile(obj)
+        return sp.gender if sp else None
+
+    def get_guardian_name(self, obj):
+        sp = self._get_student_profile(obj)
+        return sp.guardian_name if sp else None
+
+    def get_guardian_phone(self, obj):
+        sp = self._get_student_profile(obj)
+        return sp.guardian_phone if sp else None
+
+    def get_guardian_email(self, obj):
+        sp = self._get_student_profile(obj)
+        return sp.guardian_email if sp else None
+
+    def get_guardian_relationship(self, obj):
+        sp = self._get_student_profile(obj)
+        return sp.guardian_relationship if sp else None
+
+    def get_profile_picture(self, obj):
+        sp = self._get_student_profile(obj)
+        if sp and sp.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(sp.profile_picture.url)
+            return sp.profile_picture.url
+        return None
+
+    def get_current_class(self, obj):
+        assignment = StudentClassAssignment.objects.filter(
+            school=obj.school,
+            student=obj.user,
+            status=StudentClassAssignment.Status.ACTIVE,
+        ).select_related('classroom', 'academic_session').first()
+        if assignment:
+            return {
+                'assignment_id': str(assignment.id),
+                'classroom_id': str(assignment.classroom.id),
+                'classroom_name': assignment.classroom.name,
+                'session_id': str(assignment.academic_session.id),
+                'session_name': assignment.academic_session.name,
+            }
+        return None
+
+
+class CreateStudentSerializer(serializers.Serializer):
+    """Create a new student in the school."""
+
+    email          = serializers.EmailField()
+    first_name     = serializers.CharField(max_length=100)
+    last_name      = serializers.CharField(max_length=100)
+    phone          = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    admission_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    date_of_birth  = serializers.DateField(required=False, allow_null=True)
+    gender         = serializers.ChoiceField(
+        choices=['male', 'female', 'other'],
+        required=False,
+        allow_blank=True,
+    )
+    guardian_name  = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    guardian_phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    guardian_email = serializers.EmailField(required=False, allow_blank=True)
+    guardian_relationship = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    send_welcome_email = serializers.BooleanField(default=False)
+
+
+class UpdateStudentSerializer(serializers.Serializer):
+    """Update a student's profile info."""
+
+    first_name     = serializers.CharField(max_length=100, required=False)
+    last_name      = serializers.CharField(max_length=100, required=False)
+    phone          = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    admission_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    date_of_birth  = serializers.DateField(required=False, allow_null=True)
+    gender         = serializers.ChoiceField(
+        choices=['male', 'female', 'other'],
+        required=False,
+        allow_blank=True,
+    )
+    guardian_name  = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    guardian_phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    guardian_email = serializers.EmailField(required=False, allow_blank=True)
+    guardian_relationship = serializers.CharField(max_length=50, required=False, allow_blank=True)
+
+
+class BulkStudentUploadSerializer(serializers.Serializer):
+    """Bulk upload students via CSV/JSON list."""
+
+    students = serializers.ListField(
+        child=serializers.DictField(),
+        min_length=1,
+        max_length=500,
+        help_text='List of student objects with email, first_name, last_name, etc.',
+    )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 # PHASE 7A — School Dashboard, Member Management & Staff Invite
 # ═════════════════════════════════════════════════════════════════════════════
 

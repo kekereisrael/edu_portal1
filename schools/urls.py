@@ -93,4 +93,28 @@ urlpatterns = [
     path('members/students/', views.SchoolStudentsListView.as_view(), name='member_students'),
     path('members/teachers/', views.SchoolTeachersListView.as_view(), name='member_teachers'),
     path('members/invite/', views.InviteStaffView.as_view(), name='invite_staff'),
+
+    # ══ PHASE 7A — Teacher Management ═════════════════════════════════════════
+    # GET    /api/v1/schools/teachers/                                — list teachers
+    # POST   /api/v1/schools/teachers/                                — create/invite teacher
+    # GET    /api/v1/schools/teachers/<id>/                           — teacher detail
+    # PATCH  /api/v1/schools/teachers/<id>/                           — update teacher
+    # DELETE /api/v1/schools/teachers/<id>/                           — deactivate teacher
+    # POST   /api/v1/schools/teachers/<id>/assign-subject/            — assign subject
+    # DELETE /api/v1/schools/teachers/<id>/remove-subject/            — remove subject
+    path('teachers/', views.TeacherListCreateView.as_view(), name='teacher_list'),
+    path('teachers/<uuid:membership_id>/', views.TeacherDetailView.as_view(), name='teacher_detail'),
+    path('teachers/<uuid:membership_id>/assign-subject/', views.TeacherAssignSubjectView.as_view(), name='teacher_assign_subject'),
+    path('teachers/<uuid:membership_id>/remove-subject/', views.TeacherRemoveSubjectView.as_view(), name='teacher_remove_subject'),
+
+    # ══ PHASE 7A — Student Management ═════════════════════════════════════════
+    # GET    /api/v1/schools/students/                                — list students
+    # POST   /api/v1/schools/students/                                — create student
+    # POST   /api/v1/schools/students/bulk-upload/                    — bulk upload
+    # GET    /api/v1/schools/students/<id>/                           — student detail
+    # PATCH  /api/v1/schools/students/<id>/                           — update student
+    # DELETE /api/v1/schools/students/<id>/                           — deactivate student
+    path('students/', views.StudentListCreateView.as_view(), name='student_list'),
+    path('students/bulk-upload/', views.StudentBulkUploadView.as_view(), name='student_bulk_upload'),
+    path('students/<uuid:membership_id>/', views.StudentDetailView.as_view(), name='student_detail'),
 ]
