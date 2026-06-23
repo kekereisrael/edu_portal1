@@ -117,6 +117,104 @@ class Profile(models.Model):
         return f'Profile of {self.user.full_name}'
 
 
+class StudentProfile(models.Model):
+    """
+    Extended profile for students — admission number, guardian info,
+    profile picture, and school-specific metadata.
+
+    One StudentProfile per User (school-scoped via the school FK so that
+    a student who transfers schools can have a profile per school).
+    """
+
+    class Gender(models.TextChoices):
+        MALE   = 'male',   'Male'
+        FEMALE = 'female', 'Female'
+        OTHER  = 'other',  'Other'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='student_profiles',
+        db_index=True,
+    )
+    school = models.ForeignKey(
+        'schools.School',
+        on_delete=models.CASCADE,
+        related_name='student_profiles',
+        db_index=True,
+    )
+
+    # ── Academic identity ─────────────────────────────────────────────────────
+    admission_number = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text='School-assigned admission / registration number',
+    )
+    date_of_admission = models.DateField(blank=True, null=True)
+
+    # ── Personal info ─────────────────────────────────────────────────────────
+    date_of_birth = models.DateField(blank=True, null=True)
+    gender = models.CharField(
+        max_length=10,
+        choices=Gender.choices,
+        blank=True,
+        null=True,
+    )
+    profile_picture = models.ImageField(
+        upload_to='students/profile_pictures/',
+        blank=True,
+        null=True,
+    )
+    home_address = models.TextField(blank=True, null=True)
+    state_of_origin = models.CharField(max_length=100, blank=True, null=True)
+    nationality = models.CharField(max_length=100, default='Nigerian')
+    religion = models.CharField(max_length=50, blank=True, null=True)
+
+    # ── Guardian / parent contact ─────────────────────────────────────────────
+    guardian_name  = models.CharField(max_length=200, blank=True, null=True)
+    guardian_phone = models.CharField(max_length=20,  blank=True, null=True)
+    guardian_email = models.EmailField(blank=True, null=True)
+    guardian_relationship = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text='e.g. Father, Mother, Uncle, Guardian',
+    )
+    guardian_address = models.TextField(blank=True, null=True)
+
+    # ── Medical / emergency ───────────────────────────────────────────────────
+    blood_group = models.CharField(max_length=5, blank=True, null=True)
+    genotype    = models.CharField(max_length=5, blank=True, null=True)
+    medical_conditions = models.TextField(
+        blank=True, null=True,
+        help_text='Known allergies, conditions, or special needs',
+    )
+    emergency_contact_name  = models.CharField(max_length=200, blank=True, null=True)
+    emergency_contact_phone = models.CharField(max_length=20,  blank=True, null=True)
+
+    # ── Timestamps ────────────────────────────────────────────────────────────
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'student profile'
+        verbose_name_plural = 'student profiles'
+        unique_together = ['user', 'school']
+        ordering = ['user__last_name', 'user__first_name']
+        indexes = [
+            models.Index(fields=['school', 'admission_number'], name='idx_sp_school_admission'),
+        ]
+
+    def __str__(self):
+        return (
+            f'{self.user.get_full_name()} '
+            f'[{self.admission_number or "no-admission#"}] '
+            f'@ {self.school.name}'
+        )
+
+
 class UserSession(models.Model):
     """Track active user sessions for device management."""
 

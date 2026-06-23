@@ -40,11 +40,14 @@ LOCAL_APPS = [
     'subscriptions',
     'subjects',
     'exams',
+    'results',
     'materials',
     'notifications',
     'payments',
     'analytics',
     'communications',
+    'achievements',
+    'parents',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -190,19 +193,27 @@ CORS_ALLOWED_ORIGINS = config(
 )
 CORS_ALLOW_CREDENTIALS = True
 
-# Celery Settings
-CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://localhost:6379/1')
-CELERY_RESULT_BACKEND = config('REDIS_URL', default='redis://localhost:6379/0')
+# Celery Settings - Safe mode (no Redis dependency)
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='memory://')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='django-db')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_ALWAYS_EAGER = config('CELERY_TASK_ALWAYS_EAGER', default=True, cast=bool)
+CELERY_TASK_EAGER_PROPAGATES = True
 
-# Cache Settings
+# Cache Settings - Safe fallback (no Redis required)
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': config('REDIS_URL', default='redis://localhost:6379/0'),
+        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
+    }
+}
+
+# Channel Layers - In-memory fallback (no Redis required)
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
     }
 }
 
@@ -228,6 +239,15 @@ ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 # Frontend URL (for email links)
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 
+# Authentication Settings
+LOGIN_URL = '/auth/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/auth/login/'
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 # File Upload Settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
@@ -244,20 +264,72 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
     SECURE_SSL_REDIRECT = True
 
-# Logging
+# Logging — Phase 6E: Enhanced structured logging with file rotation
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'format': '[{levelname}] {asctime} {module} {process:d} {thread:d} | {message}',
             'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'simple': {
+            'format': '[{levelname}] {asctime} {name} | {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'json': {
+            'format': '{{"level":"{levelname}","time":"{asctime}","module":"{module}","message":"{message}"}}',
+            'style': '{',
+            'datefmt': '%Y-%m-%dT%H:%M:%S',
+        },
+    },
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
         },
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+        'console_verbose': {
+            'class': 'logging.StreamHandler',
             'formatter': 'verbose',
+            'filters': ['require_debug_true'],
+        },
+        'file_error': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(BASE_DIR / 'logs' / 'errors.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+            'level': 'ERROR',
+            'delay': True,  # Don't create file until first log
+        },
+        'file_audit': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(BASE_DIR / 'logs' / 'audit.log'),
+            'maxBytes': 20 * 1024 * 1024,  # 20MB
+            'backupCount': 10,
+            'formatter': 'verbose',
+            'delay': True,
+        },
+        'file_app': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(BASE_DIR / 'logs' / 'app.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10MB
+            'backupCount': 5,
+            'formatter': 'simple',
+            'delay': True,
+        },
+        'null': {
+            'class': 'logging.NullHandler',
         },
     },
     'root': {
@@ -265,10 +337,94 @@ LOGGING = {
         'level': 'INFO',
     },
     'loggers': {
+        # Django core
         'django': {
             'handlers': ['console'],
             'level': config('DJANGO_LOG_LEVEL', default='INFO'),
             'propagate': False,
         },
+        'django.request': {
+            'handlers': ['console', 'file_error'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.security': {
+            'handlers': ['console', 'file_error'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['null'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        # App loggers
+        'core': {
+            'handlers': ['console', 'file_app'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'exams': {
+            'handlers': ['console', 'file_app'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'achievements': {
+            'handlers': ['console', 'file_app'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'materials': {
+            'handlers': ['console', 'file_app'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Audit logger (used by AuditLogMiddleware)
+        'audit': {
+            'handlers': ['console', 'file_audit'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Suppress noisy third-party loggers
+        'urllib3': {'handlers': ['null'], 'propagate': False},
+        'PIL': {'handlers': ['null'], 'propagate': False},
     },
 }
+
+# Create logs directory if it doesn't exist
+import os as _os
+_logs_dir = BASE_DIR / 'logs'
+_os.makedirs(_logs_dir, exist_ok=True)
+
+# Performance: Cache settings for production
+# Override in .env: CACHE_BACKEND=django.core.cache.backends.redis.RedisCache
+# CACHE_LOCATION=redis://127.0.0.1:6379/1
+_cache_backend = config('CACHE_BACKEND', default='django.core.cache.backends.dummy.DummyCache')
+_cache_location = config('CACHE_LOCATION', default='')
+
+if _cache_backend != 'django.core.cache.backends.dummy.DummyCache' and _cache_location:
+    CACHES = {
+        'default': {
+            'BACKEND': _cache_backend,
+            'LOCATION': _cache_location,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'SOCKET_CONNECT_TIMEOUT': 5,
+                'SOCKET_TIMEOUT': 5,
+                'IGNORE_EXCEPTIONS': True,
+            },
+            'KEY_PREFIX': 'examind',
+            'TIMEOUT': 300,
+        }
+    }
+# else: keep the DummyCache default defined above
+
+# Rate limiting: additional throttle scopes for Phase 6E
+# These extend the REST_FRAMEWORK DEFAULT_THROTTLE_RATES above
+_extra_throttle_rates = {
+    'notification_send': '10/min',
+    'report_generate': '5/hour',
+    'exam_generate': '20/hour',
+    'leaderboard_rebuild': '2/hour',
+}
+REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'].update(_extra_throttle_rates)

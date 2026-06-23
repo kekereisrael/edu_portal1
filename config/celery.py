@@ -1,10 +1,15 @@
 """
 Celery configuration for the educational portal.
+Safe mode: runs tasks synchronously when broker is unavailable.
 """
 
 import os
+import logging
+
 from celery import Celery
 from celery.schedules import crontab
+
+logger = logging.getLogger(__name__)
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 

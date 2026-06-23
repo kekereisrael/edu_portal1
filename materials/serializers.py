@@ -3,49 +3,69 @@ Serializers for the materials app.
 """
 
 from rest_framework import serializers
-
 from .models import Material, MaterialProgress, MaterialComment, MaterialBookmark, MaterialRating
-from core.mixins import DynamicFieldsMixin
 
 
-class MaterialSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
-    """Serializer for materials."""
+class MaterialSerializer(serializers.ModelSerializer):
+    """List serializer for materials."""
 
     subject_name = serializers.CharField(source='subject.name', read_only=True)
-    topic_name = serializers.CharField(source='topic.name', read_only=True, default=None)
-    uploaded_by_name = serializers.CharField(source='uploaded_by.full_name', read_only=True, default=None)
+    subject_code = serializers.CharField(source='subject.code', read_only=True)
+    uploaded_by_name = serializers.CharField(source='uploaded_by.full_name', read_only=True)
     file_size_display = serializers.ReadOnlyField()
-    average_rating = serializers.SerializerMethodField()
+    file_url_resolved = serializers.SerializerMethodField()
 
     class Meta:
         model = Material
         fields = [
-            'id', 'subject', 'subject_name', 'topic', 'topic_name',
-            'term', 'title', 'description', 'material_type',
-            'file', 'file_url', 'file_size_bytes', 'file_size_display',
-            'duration_seconds', 'is_published', 'order',
-            'uploaded_by', 'uploaded_by_name', 'average_rating',
+            'id', 'title', 'description', 'subject', 'subject_name', 'subject_code',
+            'topic', 'term', 'material_type', 'file', 'file_url', 'file_url_resolved',
+            'file_size_bytes', 'file_size_display', 'duration_seconds',
+            'is_published', 'order', 'uploaded_by', 'uploaded_by_name',
             'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'uploaded_by', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'file_size_bytes', 'uploaded_by', 'created_at', 'updated_at']
 
-    def get_average_rating(self, obj):
-        ratings = obj.ratings.all()
-        if ratings.exists():
-            return round(sum(r.rating for r in ratings) / ratings.count(), 1)
-        return None
+    def get_file_url_resolved(self, obj):
+        request = self.context.get('request')
+        if obj.file and request:
+            return request.build_absolute_uri(obj.file.url)
+        return obj.file_url
 
 
 class MaterialCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating materials."""
+    """Serializer for creating/updating materials."""
 
     class Meta:
         model = Material
         fields = [
-            'subject', 'topic', 'term', 'title', 'description',
-            'material_type', 'file', 'file_url', 'file_size_bytes',
-            'duration_seconds', 'order',
+            'id', 'title', 'description', 'subject', 'topic', 'term',
+            'material_type', 'file', 'file_url', 'is_published', 'order',
         ]
+        read_only_fields = ['id']
+
+    def validate(self, data):
+        material_type = data.get('material_type', '')
+        file_obj = data.get('file')
+        file_url = data.get('file_url')
+
+        if material_type == Material.MaterialType.LINK and not file_url:
+            raise serializers.ValidationError({'file_url': 'URL is required for link type materials.'})
+        if material_type != Material.MaterialType.LINK and not file_obj and not self.instance:
+            raise serializers.ValidationError({'file': 'File is required for this material type.'})
+        return data
+
+    def create(self, validated_data):
+        file_obj = validated_data.get('file')
+        if file_obj:
+            validated_data['file_size_bytes'] = file_obj.size
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        file_obj = validated_data.get('file')
+        if file_obj:
+            validated_data['file_size_bytes'] = file_obj.size
+        return super().update(instance, validated_data)
 
 
 class MaterialProgressSerializer(serializers.ModelSerializer):
@@ -56,19 +76,11 @@ class MaterialProgressSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialProgress
         fields = [
-            'id', 'material', 'material_title', 'progress_percent',
-            'last_position', 'completed', 'completed_at',
-            'time_spent_seconds', 'last_accessed_at',
+            'id', 'student', 'material', 'material_title',
+            'progress_percent', 'last_position', 'completed',
+            'completed_at', 'time_spent_seconds', 'last_accessed_at',
         ]
-        read_only_fields = fields
-
-
-class UpdateProgressSerializer(serializers.Serializer):
-    """Serializer for updating progress."""
-
-    progress_percent = serializers.IntegerField(min_value=0, max_value=100)
-    last_position = serializers.IntegerField(required=False, min_value=0)
-    time_spent_seconds = serializers.IntegerField(required=False, min_value=0, default=0)
+        read_only_fields = ['id', 'student', 'completed', 'completed_at', 'last_accessed_at']
 
 
 class MaterialCommentSerializer(serializers.ModelSerializer):
@@ -81,33 +93,37 @@ class MaterialCommentSerializer(serializers.ModelSerializer):
         model = MaterialComment
         fields = [
             'id', 'material', 'user', 'user_name', 'parent',
-            'content', 'replies', 'created_at', 'updated_at',
+            'content', 'is_deleted', 'replies', 'created_at',
         ]
-        read_only_fields = ['id', 'user', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'user', 'created_at']
 
     def get_replies(self, obj):
-        if obj.replies.filter(is_deleted=False).exists():
-            return MaterialCommentSerializer(
-                obj.replies.filter(is_deleted=False), many=True, context=self.context
-            ).data
+        if obj.parent is None:
+            replies = obj.replies.filter(is_deleted=False)
+            return MaterialCommentSerializer(replies, many=True, context=self.context).data
         return []
 
 
 class MaterialBookmarkSerializer(serializers.ModelSerializer):
-    """Serializer for bookmarks."""
+    """Serializer for material bookmarks."""
 
     material_title = serializers.CharField(source='material.title', read_only=True)
 
     class Meta:
         model = MaterialBookmark
-        fields = ['id', 'material', 'material_title', 'note', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = ['id', 'student', 'material', 'material_title', 'note', 'created_at']
+        read_only_fields = ['id', 'student', 'created_at']
 
 
 class MaterialRatingSerializer(serializers.ModelSerializer):
-    """Serializer for ratings."""
+    """Serializer for material ratings."""
 
     class Meta:
         model = MaterialRating
-        fields = ['id', 'material', 'rating', 'review', 'created_at']
-        read_only_fields = ['id', 'material', 'created_at']
+        fields = ['id', 'student', 'material', 'rating', 'review', 'created_at']
+        read_only_fields = ['id', 'student', 'created_at']
+
+    def validate_rating(self, value):
+        if value < 1 or value > 5:
+            raise serializers.ValidationError('Rating must be between 1 and 5.')
+        return value

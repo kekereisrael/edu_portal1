@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Notifications — EduPortal{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- Page Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Notifications</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        {% if unread_count > 0 %}
+          You have <span class="font-semibold text-primary-600 dark:text-primary-400">{{ unread_count }}</span> unread notification{% if unread_count != 1 %}s{% endif %}
+        {% else %}
+          All caught up!
+        {% endif %}
+      </p>
+    </div>
+    {% if notifications %}
+    <div class="flex items-center gap-2">
+      <button onclick="markAllRead()" class="btn btn-ghost btn-sm rounded-xl gap-2 text-primary-600 dark:text-primary-400">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        Mark all read
+      </button>
+      <button onclick="clearAllNotifications()" class="btn btn-ghost btn-sm rounded-xl gap-2 text-red-400 hover:text-red-600">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+        </svg>
+        Clear all
+      </button>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Filter Tabs -->
+  <div class="flex gap-2 border-b border-gray-100 dark:border-slate-700">
+    <button onclick="filterNotifications('all')" id="tab-all"
+      class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-primary-500 text-primary-600 dark:text-primary-400 -mb-px transition-colors">
+      All
+    </button>
+    <button onclick="filterNotifications('unread')" id="tab-unread"
+      class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 -mb-px transition-colors">
+      Unread {% if unread_count %}<span class="badge badge-primary badge-sm ml-1">{{ unread_count }}</span>{% endif %}
+    </button>
+  </div>
+
+  <!-- Notifications List -->
+  {% if notifications %}
+  <div id="notifications-list" class="space-y-2">
+    {% for notification in notifications %}
+    <div class="notification-item bg-white dark:bg-slate-800 rounded-2xl border shadow-soft transition-all
+      {% if not notification.is_read %}border-primary-200 dark:border-primary-800 bg-primary-50/30 dark:bg-primary-900/10{% else %}border-gray-100 dark:border-slate-700{% endif %}"
+         data-id="{{ notification.id }}"
+         data-read="{{ notification.is_read|yesno:'true,false' }}">
+      <div class="flex items-start gap-4 p-4">
+        <!-- Icon -->
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
+          {% if notification.notification_type == 'exam_result' %}bg-success-100 dark:bg-success-900/30
+          {% elif notification.notification_type == 'exam_reminder' %}bg-warning-100 dark:bg-warning-900/30
+          {% elif notification.notification_type == 'new_material' %}bg-blue-100 dark:bg-blue-900/30
+          {% elif notification.notification_type == 'announcement' %}bg-purple-100 dark:bg-purple-900/30
+          {% else %}bg-gray-100 dark:bg-slate-700{% endif %}">
+          {% if notification.notification_type == 'exam_result' %}
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-success-600 dark:text-success-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          {% elif notification.notification_type == 'exam_reminder' %}
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning-600 dark:text-warning-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          {% elif notification.notification_type == 'new_material' %}
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          {% elif notification.notification_type == 'announcement' %}
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+          </svg>
+          {% else %}
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+          </svg>
+          {% endif %}
+        </div>
+
+        <!-- Content -->
+        <div class="flex-1 min-w-0">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex-1">
+              <p class="text-sm font-medium text-gray-900 dark:text-white leading-snug">{{ notification.title }}</p>
+              {% if notification.message %}
+              <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">{{ notification.message }}</p>
+              {% endif %}
+              <p class="text-xs text-gray-400 dark:text-gray-500 mt-1.5">{{ notification.created_at|timesince }} ago</p>
+            </div>
+            <div class="flex items-center gap-1 flex-shrink-0">
+              {% if not notification.is_read %}
+              <div class="w-2 h-2 rounded-full bg-primary-500 flex-shrink-0 mt-1"></div>
+              {% endif %}
+              <button onclick="markRead('{{ notification.id }}')"
+                class="btn btn-ghost btn-xs btn-circle rounded-lg text-gray-400 hover:text-primary-600 {% if notification.is_read %}opacity-0 pointer-events-none{% endif %}"
+                id="mark-btn-{{ notification.id }}" title="Mark as read">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+              </button>
+              <button onclick="deleteNotification('{{ notification.id }}')"
+                class="btn btn-ghost btn-xs btn-circle rounded-lg text-gray-400 hover:text-red-500" title="Delete">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          {% if notification.action_url %}
+          <a href="{{ notification.action_url }}" class="inline-flex items-center gap-1 mt-2 text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium">
+            View details
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- No unread state (shown when filter = unread and all read) -->
+  <div id="no-unread" class="hidden text-center py-12">
+    <div class="w-16 h-16 bg-success-50 dark:bg-success-900/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-success-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+    </div>
+    <p class="text-gray-500 dark:text-gray-400 font-medium">All caught up!</p>
+    <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">No unread notifications</p>
+  </div>
+
+  {% else %}
+  <!-- Empty state -->
+  <div class="text-center py-20">
+    <div class="w-20 h-20 bg-gray-100 dark:bg-slate-700 rounded-3xl flex items-center justify-center mx-auto mb-4">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+      </svg>
+    </div>
+    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">No notifications</h3>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">You're all caught up. Notifications will appear here.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const CSRF_TOKEN = '{{ csrf_token }}';
+  let currentFilter = 'all';
+
+  // ── Tab filter ───────────────────────────────────────────
+  function filterNotifications(filter) {
+    currentFilter = filter;
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.classList.remove('border-primary-500', 'text-primary-600', 'dark:text-primary-400');
+      btn.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+    });
+    const activeTab = document.getElementById('tab-' + filter);
+    if (activeTab) {
+      activeTab.classList.add('border-primary-500', 'text-primary-600', 'dark:text-primary-400');
+      activeTab.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+    }
+
+    const items = document.querySelectorAll('.notification-item');
+    let unreadVisible = 0;
+    items.forEach(item => {
+      const isRead = item.dataset.read === 'true';
+      if (filter === 'unread') {
+        item.style.display = isRead ? 'none' : '';
+        if (!isRead) unreadVisible++;
+      } else {
+        item.style.display = '';
+      }
+    });
+
+    const noUnread = document.getElementById('no-unread');
+    if (noUnread) {
+      noUnread.classList.toggle('hidden', filter !== 'unread' || unreadVisible > 0);
+    }
+  }
+
+  // ── Mark single as read ──────────────────────────────────
+  async function markRead(id) {
+    const resp = await fetch(`/api/v1/notifications/${id}/mark_read/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF_TOKEN },
+    });
+    if (resp.ok) {
+      const item = document.querySelector(`[data-id="${id}"]`);
+      if (item) {
+        item.dataset.read = 'true';
+        item.classList.remove('border-primary-200', 'dark:border-primary-800', 'bg-primary-50/30', 'dark:bg-primary-900/10');
+        item.classList.add('border-gray-100', 'dark:border-slate-700');
+        // Hide the unread dot and mark button
+        const dot = item.querySelector('.bg-primary-500.rounded-full');
+        if (dot) dot.remove();
+        const btn = document.getElementById('mark-btn-' + id);
+        if (btn) { btn.classList.add('opacity-0', 'pointer-events-none'); }
+      }
+      updateUnreadBadge(-1);
+    }
+  }
+
+  // ── Mark all read ────────────────────────────────────────
+  async function markAllRead() {
+    const resp = await fetch('/api/v1/notifications/mark_all_read/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF_TOKEN },
+    });
+    if (resp.ok) window.location.reload();
+    else alert('Failed to mark all as read.');
+  }
+
+  // ── Delete single ────────────────────────────────────────
+  async function deleteNotification(id) {
+    const resp = await fetch(`/api/v1/notifications/${id}/`, {
+      method: 'DELETE',
+      headers: { 'X-CSRFToken': CSRF_TOKEN },
+    });
+    if (resp.ok || resp.status === 204) {
+      const item = document.querySelector(`[data-id="${id}"]`);
+      if (item) {
+        item.style.transition = 'opacity 0.3s, transform 0.3s';
+        item.style.opacity = '0';
+        item.style.transform = 'translateX(20px)';
+        setTimeout(() => item.remove(), 300);
+      }
+    }
+  }
+
+  // ── Clear all ────────────────────────────────────────────
+  async function clearAllNotifications() {
+    if (!confirm('Delete all notifications? This cannot be undone.')) return;
+    const resp = await fetch('/api/v1/notifications/clear_all/', {
+      method: 'DELETE',
+      headers: { 'X-CSRFToken': CSRF_TOKEN },
+    });
+    if (resp.ok || resp.status === 204) window.location.reload();
+    else alert('Failed to clear notifications.');
+  }
+
+  function updateUnreadBadge(delta) {
+    const badge = document.querySelector('.badge-primary');
+    if (badge) {
+      const current = parseInt(badge.textContent) || 0;
+      const next = Math.max(0, current + delta);
+      if (next === 0) badge.remove();
+      else badge.textContent = next;
+    }
+  }
+</script>
+{% endblock %}
