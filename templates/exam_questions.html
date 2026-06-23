@@ -1,0 +1,470 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Question Builder — {{ exam.title|default:"Exam" }} — EduPortal{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- Page Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div class="flex items-center gap-4">
+      <a href="/exams/" class="btn btn-ghost btn-sm btn-circle rounded-xl">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </a>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Question Builder</h1>
+        {% if exam %}
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          {{ exam.title }} &mdash; <span class="text-primary-600 dark:text-primary-400">{{ exam.subject.name }}</span>
+        </p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <!-- Stats pill -->
+      <div class="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 px-4 py-2 flex items-center gap-3 shadow-soft">
+        <div class="text-center">
+          <p class="text-xs text-gray-400 dark:text-gray-500">Questions</p>
+          <p class="text-lg font-bold text-gray-900 dark:text-white" id="question-count">{{ question_count }}</p>
+        </div>
+        <div class="w-px h-8 bg-gray-100 dark:bg-slate-700"></div>
+        <div class="text-center">
+          <p class="text-xs text-gray-400 dark:text-gray-500">Total Marks</p>
+          <p class="text-lg font-bold text-primary-600 dark:text-primary-400" id="total-marks">{{ exam.total_marks|default:0 }}</p>
+        </div>
+      </div>
+      <button onclick="document.getElementById('modal-add-question').showModal()"
+        class="btn btn-primary gap-2 rounded-xl">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Add Question
+      </button>
+    </div>
+  </div>
+
+  <!-- Exam Status Banner -->
+  {% if exam %}
+  <div class="flex items-center gap-3 p-4 rounded-2xl
+    {% if exam.status == 'draft' %}bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800
+    {% elif exam.status == 'published' %}bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800
+    {% else %}bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700{% endif %}">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0
+      {% if exam.status == 'draft' %}text-warning-600 dark:text-warning-400
+      {% elif exam.status == 'published' %}text-success-600 dark:text-success-400
+      {% else %}text-gray-500{% endif %}"
+      fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <div class="flex-1">
+      <p class="text-sm font-medium
+        {% if exam.status == 'draft' %}text-warning-700 dark:text-warning-300
+        {% elif exam.status == 'published' %}text-success-700 dark:text-success-300
+        {% else %}text-gray-700 dark:text-gray-300{% endif %}">
+        Status: {{ exam.get_status_display }}
+        {% if exam.status == 'draft' %} — Add all questions then publish the exam.{% endif %}
+        {% if exam.status == 'published' %} — Exam is live. Students can take it now.{% endif %}
+      </p>
+    </div>
+    {% if exam.status == 'draft' and question_count > 0 %}
+    <button onclick="publishExam()" class="btn btn-success btn-sm rounded-xl gap-1">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+      </svg>
+      Publish Exam
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Questions List -->
+  {% if questions %}
+  <div id="questions-list" class="space-y-3">
+    {% for question in questions %}
+    <div class="question-item bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-soft p-5"
+         data-id="{{ question.id }}" data-order="{{ question.order }}">
+      <div class="flex items-start gap-4">
+        <!-- Drag handle + number -->
+        <div class="flex flex-col items-center gap-1 flex-shrink-0 pt-1">
+          <div class="cursor-grab text-gray-300 dark:text-gray-600 hover:text-gray-400 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+          </div>
+          <span class="text-xs font-bold text-gray-400 dark:text-gray-500">Q{{ forloop.counter }}</span>
+        </div>
+
+        <!-- Question Content -->
+        <div class="flex-1 min-w-0">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-2 flex-wrap">
+                <span class="badge badge-ghost text-xs">{{ question.get_question_type_display }}</span>
+                <span class="badge text-xs
+                  {% if question.difficulty == 'easy' %}badge-success
+                  {% elif question.difficulty == 'hard' %}badge-error
+                  {% else %}badge-warning{% endif %}">
+                  {{ question.get_difficulty_display }}
+                </span>
+                <span class="badge badge-outline text-xs">{{ question.marks }} mark{% if question.marks != 1 %}s{% endif %}</span>
+              </div>
+              <p class="text-sm font-medium text-gray-900 dark:text-white leading-relaxed">{{ question.question_text }}</p>
+
+              <!-- Options (MCQ) -->
+              {% if question.question_type == 'mcq' %}
+              <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {% if question.option_a %}
+                <div class="flex items-center gap-2 p-2 rounded-lg {% if question.correct_answer == 'A' %}bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800{% else %}bg-gray-50 dark:bg-slate-700{% endif %}">
+                  <span class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
+                    {% if question.correct_answer == 'A' %}bg-success-500 text-white{% else %}bg-gray-200 dark:bg-slate-600 text-gray-600 dark:text-gray-400{% endif %}">A</span>
+                  <span class="text-xs text-gray-700 dark:text-gray-300">{{ question.option_a }}</span>
+                </div>
+                {% endif %}
+                {% if question.option_b %}
+                <div class="flex items-center gap-2 p-2 rounded-lg {% if question.correct_answer == 'B' %}bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800{% else %}bg-gray-50 dark:bg-slate-700{% endif %}">
+                  <span class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
+                    {% if question.correct_answer == 'B' %}bg-success-500 text-white{% else %}bg-gray-200 dark:bg-slate-600 text-gray-600 dark:text-gray-400{% endif %}">B</span>
+                  <span class="text-xs text-gray-700 dark:text-gray-300">{{ question.option_b }}</span>
+                </div>
+                {% endif %}
+                {% if question.option_c %}
+                <div class="flex items-center gap-2 p-2 rounded-lg {% if question.correct_answer == 'C' %}bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800{% else %}bg-gray-50 dark:bg-slate-700{% endif %}">
+                  <span class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
+                    {% if question.correct_answer == 'C' %}bg-success-500 text-white{% else %}bg-gray-200 dark:bg-slate-600 text-gray-600 dark:text-gray-400{% endif %}">C</span>
+                  <span class="text-xs text-gray-700 dark:text-gray-300">{{ question.option_c }}</span>
+                </div>
+                {% endif %}
+                {% if question.option_d %}
+                <div class="flex items-center gap-2 p-2 rounded-lg {% if question.correct_answer == 'D' %}bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800{% else %}bg-gray-50 dark:bg-slate-700{% endif %}">
+                  <span class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
+                    {% if question.correct_answer == 'D' %}bg-success-500 text-white{% else %}bg-gray-200 dark:bg-slate-600 text-gray-600 dark:text-gray-400{% endif %}">D</span>
+                  <span class="text-xs text-gray-700 dark:text-gray-300">{{ question.option_d }}</span>
+                </div>
+                {% endif %}
+              </div>
+              {% elif question.question_type == 'true_false' %}
+              <div class="mt-2 flex gap-2">
+                <span class="badge {% if question.correct_answer == 'True' %}badge-success{% else %}badge-ghost{% endif %} text-xs">True</span>
+                <span class="badge {% if question.correct_answer == 'False' %}badge-success{% else %}badge-ghost{% endif %} text-xs">False</span>
+                <span class="text-xs text-success-600 dark:text-success-400 font-medium">✓ {{ question.correct_answer }}</span>
+              </div>
+              {% endif %}
+
+              {% if question.explanation %}
+              <div class="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <p class="text-xs text-blue-600 dark:text-blue-400"><strong>Explanation:</strong> {{ question.explanation }}</p>
+              </div>
+              {% endif %}
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-1 flex-shrink-0">
+              <button onclick="editQuestion('{{ question.id }}')"
+                class="btn btn-ghost btn-xs btn-circle rounded-lg text-gray-400 hover:text-primary-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+              </button>
+              <button onclick="deleteQuestion('{{ question.id }}')"
+                class="btn btn-ghost btn-xs btn-circle rounded-lg text-gray-400 hover:text-red-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <!-- Empty state -->
+  <div class="text-center py-20 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-soft">
+    <div class="w-20 h-20 bg-primary-50 dark:bg-primary-900/20 rounded-3xl flex items-center justify-center mx-auto mb-4">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+    </div>
+    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">No questions yet</h3>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-sm mx-auto">Add your first question to build this exam.</p>
+    <button onclick="document.getElementById('modal-add-question').showModal()"
+      class="btn btn-primary mt-4 rounded-xl gap-2">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      Add First Question
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ─── Add / Edit Question Modal ─── -->
+<dialog id="modal-add-question" class="modal">
+  <div class="modal-box max-w-2xl rounded-2xl bg-white dark:bg-slate-800 p-0 overflow-hidden">
+    <div class="bg-gradient-to-r from-primary-600 to-secondary-600 p-6">
+      <h3 class="font-bold text-lg text-white" id="modal-question-title">Add Question</h3>
+      <p class="text-primary-100 text-sm mt-1">Build a question for this exam</p>
+    </div>
+
+    <form id="question-form" class="p-6 space-y-4 max-h-[70vh] overflow-y-auto" onsubmit="submitQuestionForm(event)">
+      <input type="hidden" id="question-id" value="">
+
+      <!-- Question Type -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Question Type *</span></label>
+          <select id="q-type" onchange="toggleQuestionType()" class="select select-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full" required>
+            <option value="mcq">Multiple Choice (MCQ)</option>
+            <option value="true_false">True / False</option>
+            <option value="short_answer">Short Answer</option>
+          </select>
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Difficulty *</span></label>
+          <select id="q-difficulty" class="select select-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Marks *</span></label>
+          <input type="number" id="q-marks" value="1" min="1" max="100"
+            class="input input-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full" required>
+        </div>
+      </div>
+
+      <!-- Question Text -->
+      <div class="form-control">
+        <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Question Text *</span></label>
+        <textarea id="q-text" rows="3" placeholder="Enter your question here..."
+          class="textarea textarea-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full resize-none" required></textarea>
+      </div>
+
+      <!-- MCQ Options -->
+      <div id="mcq-options" class="space-y-3">
+        <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Answer Options *</span></label>
+        <div class="space-y-2">
+          {% for letter in "ABCD" %}
+          <div class="flex items-center gap-3">
+            <span class="w-8 h-8 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-400 flex-shrink-0">{{ letter }}</span>
+            <input type="text" id="q-option-{{ letter|lower }}" placeholder="Option {{ letter }}"
+              class="input input-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 flex-1 text-sm">
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Correct Answer *</span></label>
+          <select id="q-correct-mcq" class="select select-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full">
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- True/False Options -->
+      <div id="tf-options" class="hidden form-control">
+        <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Correct Answer *</span></label>
+        <select id="q-correct-tf" class="select select-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full">
+          <option value="True">True</option>
+          <option value="False">False</option>
+        </select>
+      </div>
+
+      <!-- Short Answer Correct -->
+      <div id="sa-options" class="hidden form-control">
+        <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Expected Answer (for reference)</span></label>
+        <input type="text" id="q-correct-sa" placeholder="Expected answer..."
+          class="input input-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full">
+      </div>
+
+      <!-- Explanation -->
+      <div class="form-control">
+        <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Explanation <span class="text-gray-400 font-normal">(shown after submission)</span></span></label>
+        <textarea id="q-explanation" rows="2" placeholder="Explain why this is the correct answer..."
+          class="textarea textarea-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full resize-none"></textarea>
+      </div>
+
+      <!-- Error -->
+      <div id="question-error" class="hidden alert alert-error rounded-xl text-sm py-2"></div>
+
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="closeQuestionModal()" class="btn btn-ghost flex-1 rounded-xl">Cancel</button>
+        <button type="submit" id="question-submit-btn" class="btn btn-primary flex-1 rounded-xl gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          </svg>
+          Save Question
+        </button>
+      </div>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const CSRF_TOKEN = '{{ csrf_token }}';
+  const EXAM_ID = '{{ exam.id|default:"" }}';
+
+  // ── Question type toggle ─────────────────────────────────
+  function toggleQuestionType() {
+    const type = document.getElementById('q-type').value;
+    document.getElementById('mcq-options').classList.toggle('hidden', type !== 'mcq');
+    document.getElementById('tf-options').classList.toggle('hidden', type !== 'true_false');
+    document.getElementById('sa-options').classList.toggle('hidden', type !== 'short_answer');
+  }
+
+  function closeQuestionModal() {
+    document.getElementById('modal-add-question').close();
+    resetQuestionForm();
+  }
+
+  function resetQuestionForm() {
+    document.getElementById('question-id').value = '';
+    document.getElementById('modal-question-title').textContent = 'Add Question';
+    document.getElementById('q-type').value = 'mcq';
+    document.getElementById('q-difficulty').value = 'medium';
+    document.getElementById('q-marks').value = '1';
+    document.getElementById('q-text').value = '';
+    document.getElementById('q-option-a').value = '';
+    document.getElementById('q-option-b').value = '';
+    document.getElementById('q-option-c').value = '';
+    document.getElementById('q-option-d').value = '';
+    document.getElementById('q-correct-mcq').value = 'A';
+    document.getElementById('q-correct-tf').value = 'True';
+    document.getElementById('q-correct-sa').value = '';
+    document.getElementById('q-explanation').value = '';
+    document.getElementById('question-error').classList.add('hidden');
+    toggleQuestionType();
+  }
+
+  // ── Submit question ──────────────────────────────────────
+  async function submitQuestionForm(e) {
+    e.preventDefault();
+    const errDiv = document.getElementById('question-error');
+    errDiv.classList.add('hidden');
+    const btn = document.getElementById('question-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Saving...';
+
+    const questionId = document.getElementById('question-id').value;
+    const isEdit = !!questionId;
+    const qType = document.getElementById('q-type').value;
+
+    let correctAnswer = '';
+    if (qType === 'mcq') correctAnswer = document.getElementById('q-correct-mcq').value;
+    else if (qType === 'true_false') correctAnswer = document.getElementById('q-correct-tf').value;
+    else correctAnswer = document.getElementById('q-correct-sa').value;
+
+    const payload = {
+      exam: EXAM_ID,
+      question_text: document.getElementById('q-text').value,
+      question_type: qType,
+      difficulty: document.getElementById('q-difficulty').value,
+      marks: parseInt(document.getElementById('q-marks').value),
+      correct_answer: correctAnswer,
+      explanation: document.getElementById('q-explanation').value,
+    };
+
+    if (qType === 'mcq') {
+      payload.option_a = document.getElementById('q-option-a').value;
+      payload.option_b = document.getElementById('q-option-b').value;
+      payload.option_c = document.getElementById('q-option-c').value;
+      payload.option_d = document.getElementById('q-option-d').value;
+    }
+
+    const url = isEdit ? `/api/v1/exams/${EXAM_ID}/questions/${questionId}/` : `/api/v1/exams/${EXAM_ID}/questions/`;
+    const method = isEdit ? 'PATCH' : 'POST';
+
+    try {
+      const resp = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify(payload),
+      });
+      if (resp.ok) {
+        closeQuestionModal();
+        window.location.reload();
+      } else {
+        const data = await resp.json();
+        const msg = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
+        errDiv.textContent = msg || 'Failed to save question.';
+        errDiv.classList.remove('hidden');
+      }
+    } catch {
+      errDiv.textContent = 'Network error. Please try again.';
+      errDiv.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Save Question';
+    }
+  }
+
+  // ── Edit question ────────────────────────────────────────
+  async function editQuestion(id) {
+    try {
+      const resp = await fetch(`/api/v1/exams/${EXAM_ID}/questions/${id}/`);
+      if (!resp.ok) return;
+      const q = await resp.json();
+
+      document.getElementById('question-id').value = q.id;
+      document.getElementById('modal-question-title').textContent = 'Edit Question';
+      document.getElementById('q-type').value = q.question_type;
+      document.getElementById('q-difficulty').value = q.difficulty;
+      document.getElementById('q-marks').value = q.marks;
+      document.getElementById('q-text').value = q.question_text;
+      document.getElementById('q-option-a').value = q.option_a || '';
+      document.getElementById('q-option-b').value = q.option_b || '';
+      document.getElementById('q-option-c').value = q.option_c || '';
+      document.getElementById('q-option-d').value = q.option_d || '';
+      document.getElementById('q-explanation').value = q.explanation || '';
+
+      toggleQuestionType();
+
+      if (q.question_type === 'mcq') document.getElementById('q-correct-mcq').value = q.correct_answer;
+      else if (q.question_type === 'true_false') document.getElementById('q-correct-tf').value = q.correct_answer;
+      else document.getElementById('q-correct-sa').value = q.correct_answer;
+
+      document.getElementById('modal-add-question').showModal();
+    } catch {
+      alert('Failed to load question data.');
+    }
+  }
+
+  // ── Delete question ──────────────────────────────────────
+  async function deleteQuestion(id) {
+    if (!confirm('Delete this question? This cannot be undone.')) return;
+    const resp = await fetch(`/api/v1/exams/${EXAM_ID}/questions/${id}/`, {
+      method: 'DELETE',
+      headers: { 'X-CSRFToken': CSRF_TOKEN },
+    });
+    if (resp.ok || resp.status === 204) {
+      window.location.reload();
+    } else {
+      alert('Failed to delete question.');
+    }
+  }
+
+  // ── Publish exam ─────────────────────────────────────────
+  async function publishExam() {
+    const resp = await fetch(`/api/v1/exams/${EXAM_ID}/publish/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF_TOKEN },
+    });
+    if (resp.ok) window.location.reload();
+    else alert('Failed to publish exam. Make sure there are questions added.');
+  }
+
+  // Init
+  toggleQuestionType();
+</script>
+{% endblock %}

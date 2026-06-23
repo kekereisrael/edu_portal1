@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Subjects — EduPortal{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- Page Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Subjects</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        {% if is_teacher_or_admin %}Manage subjects for your school{% else %}Your enrolled subjects{% endif %}
+      </p>
+    </div>
+    {% if is_teacher_or_admin %}
+    <button onclick="document.getElementById('modal-create-subject').showModal()"
+      class="btn btn-primary gap-2 rounded-xl">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      New Subject
+    </button>
+    {% endif %}
+  </div>
+
+  <!-- Search Bar -->
+  <div class="relative">
+    <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+    </svg>
+    <input type="text" id="subject-search" placeholder="Search subjects..."
+      class="input input-bordered w-full pl-10 rounded-xl bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700"
+      oninput="filterSubjects(this.value)">
+  </div>
+
+  <!-- Subjects Grid -->
+  {% if subjects %}
+  <div id="subjects-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    {% for subject in subjects %}
+    <div class="subject-card card bg-white dark:bg-slate-800 shadow-soft rounded-2xl border border-gray-100 dark:border-slate-700 card-hover"
+         data-name="{{ subject.name|lower }}" data-code="{{ subject.code|lower }}">
+      <div class="card-body p-5">
+        <!-- Color accent bar -->
+        <div class="h-1.5 w-12 rounded-full mb-3"
+             style="background: hsl({{ subject.name|length }}0, 65%, 55%)"></div>
+
+        <div class="flex items-start justify-between">
+          <div class="flex-1 min-w-0">
+            <span class="badge badge-ghost text-xs font-mono mb-1">{{ subject.code }}</span>
+            <h3 class="font-semibold text-gray-900 dark:text-white text-sm leading-tight mt-1">{{ subject.name }}</h3>
+            {% if subject.description %}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{{ subject.description }}</p>
+            {% endif %}
+          </div>
+          {% if is_teacher_or_admin %}
+          <div class="dropdown dropdown-end ml-2">
+            <label tabindex="0" class="btn btn-ghost btn-xs btn-circle">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/>
+              </svg>
+            </label>
+            <ul tabindex="0" class="dropdown-content menu p-2 shadow bg-white dark:bg-slate-800 rounded-xl w-40 z-50 border border-gray-100 dark:border-slate-700">
+              <li><a onclick="editSubject('{{ subject.id }}', '{{ subject.name }}', '{{ subject.code }}', '{{ subject.description|default:'' }}')" class="text-sm">Edit</a></li>
+              <li><a onclick="deleteSubject('{{ subject.id }}', '{{ subject.name }}')" class="text-sm text-red-500">Delete</a></li>
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="mt-3 flex items-center gap-2 flex-wrap">
+          {% if subject.department %}
+          <span class="badge badge-outline text-xs">{{ subject.department.name }}</span>
+          {% endif %}
+          {% if subject.is_elective %}
+          <span class="badge badge-warning badge-outline text-xs">Elective</span>
+          {% else %}
+          <span class="badge badge-success badge-outline text-xs">Core</span>
+          {% endif %}
+          <span class="badge badge-ghost text-xs">{{ subject.credit_units }} credit{% if subject.credit_units != 1 %}s{% endif %}</span>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="flex flex-col items-center justify-center py-20 text-center">
+    <div class="w-20 h-20 bg-primary-50 dark:bg-primary-900/20 rounded-full flex items-center justify-center mb-4">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+      </svg>
+    </div>
+    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">No subjects yet</h3>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+      {% if is_teacher_or_admin %}Create your first subject to get started.{% else %}No subjects have been assigned yet.{% endif %}
+    </p>
+    {% if is_teacher_or_admin %}
+    <button onclick="document.getElementById('modal-create-subject').showModal()"
+      class="btn btn-primary btn-sm mt-4 rounded-xl">Create Subject</button>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Create/Edit Subject Modal -->
+{% if is_teacher_or_admin %}
+<dialog id="modal-create-subject" class="modal">
+  <div class="modal-box rounded-2xl max-w-lg">
+    <h3 class="font-bold text-lg mb-4" id="modal-title">Create Subject</h3>
+    <form id="subject-form" onsubmit="saveSubject(event)">
+      <input type="hidden" id="subject-id" value="">
+      <div class="space-y-4">
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Subject Name *</span></label>
+          <input type="text" id="field-name" placeholder="e.g. Mathematics" required
+            class="input input-bordered rounded-xl w-full">
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Subject Code *</span></label>
+          <input type="text" id="field-code" placeholder="e.g. MATH101" required
+            class="input input-bordered rounded-xl w-full">
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium">Description</span></label>
+          <textarea id="field-description" rows="3" placeholder="Brief description..."
+            class="textarea textarea-bordered rounded-xl w-full"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium">Credit Units</span></label>
+            <input type="number" id="field-credits" value="1" min="1" max="10"
+              class="input input-bordered rounded-xl w-full">
+          </div>
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium">Type</span></label>
+            <select id="field-elective" class="select select-bordered rounded-xl w-full">
+              <option value="false">Core</option>
+              <option value="true">Elective</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div id="form-error" class="alert alert-error rounded-xl mt-3 hidden">
+        <span id="form-error-msg"></span>
+      </div>
+      <div class="modal-action mt-4">
+        <button type="button" onclick="document.getElementById('modal-create-subject').close()"
+          class="btn btn-ghost rounded-xl">Cancel</button>
+        <button type="submit" id="save-btn" class="btn btn-primary rounded-xl">Save Subject</button>
+      </div>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Delete Confirm Modal -->
+<dialog id="modal-delete-subject" class="modal">
+  <div class="modal-box rounded-2xl max-w-sm">
+    <h3 class="font-bold text-lg text-red-600">Delete Subject</h3>
+    <p class="py-3 text-sm text-gray-600 dark:text-gray-300">
+      Are you sure you want to delete <strong id="delete-subject-name"></strong>? This action cannot be undone.
+    </p>
+    <div class="modal-action">
+      <button onclick="document.getElementById('modal-delete-subject').close()" class="btn btn-ghost rounded-xl">Cancel</button>
+      <button id="confirm-delete-btn" class="btn btn-error rounded-xl">Delete</button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Get CSRF token
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  function filterSubjects(query) {
+    const q = query.toLowerCase();
+    document.querySelectorAll('.subject-card').forEach(card => {
+      const name = card.dataset.name || '';
+      const code = card.dataset.code || '';
+      card.style.display = (name.includes(q) || code.includes(q)) ? '' : 'none';
+    });
+  }
+
+  function editSubject(id, name, code, description) {
+    document.getElementById('modal-title').textContent = 'Edit Subject';
+    document.getElementById('subject-id').value = id;
+    document.getElementById('field-name').value = name;
+    document.getElementById('field-code').value = code;
+    document.getElementById('field-description').value = description;
+    document.getElementById('modal-create-subject').showModal();
+  }
+
+  async function saveSubject(e) {
+    e.preventDefault();
+    const id = document.getElementById('subject-id').value;
+    const btn = document.getElementById('save-btn');
+    btn.classList.add('loading');
+
+    const payload = {
+      name: document.getElementById('field-name').value,
+      code: document.getElementById('field-code').value,
+      description: document.getElementById('field-description').value,
+      credit_units: parseInt(document.getElementById('field-credits').value),
+      is_elective: document.getElementById('field-elective').value === 'true',
+    };
+
+    const url = id ? `/api/v1/subjects/${id}/` : '/api/v1/subjects/';
+    const method = id ? 'PATCH' : 'POST';
+
+    try {
+      const resp = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: JSON.stringify(payload),
+      });
+      if (resp.ok) {
+        window.location.reload();
+      } else {
+        const data = await resp.json();
+        const errMsg = Object.values(data).flat().join(', ');
+        document.getElementById('form-error-msg').textContent = errMsg;
+        document.getElementById('form-error').classList.remove('hidden');
+      }
+    } catch (err) {
+      document.getElementById('form-error-msg').textContent = 'Network error. Please try again.';
+      document.getElementById('form-error').classList.remove('hidden');
+    }
+    btn.classList.remove('loading');
+  }
+
+  let deleteTargetId = null;
+  function deleteSubject(id, name) {
+    deleteTargetId = id;
+    document.getElementById('delete-subject-name').textContent = name;
+    document.getElementById('modal-delete-subject').showModal();
+  }
+
+  document.getElementById('confirm-delete-btn')?.addEventListener('click', async () => {
+    if (!deleteTargetId) return;
+    try {
+      const resp = await fetch(`/api/v1/subjects/${deleteTargetId}/`, {
+        method: 'DELETE',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+      });
+      if (resp.ok || resp.status === 204) {
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  });
+</script>
+{% endblock %}

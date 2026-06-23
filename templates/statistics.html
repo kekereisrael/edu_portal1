@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% block title %}Results & Statistics — EduPortal{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Results & Statistics</h1>
+            <p class="text-gray-500 dark:text-slate-400 mt-1">Track your academic performance and progress over time.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <!-- Filter Dropdown -->
+            <div class="relative">
+                <select class="appearance-none pl-4 pr-10 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl text-sm text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 transition-smooth cursor-pointer">
+                    <option value="all">All Time</option>
+                    <option value="term">This Term</option>
+                    <option value="month">This Month</option>
+                    <option value="week">This Week</option>
+                </select>
+                <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </div>
+            <button class="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 hover:border-primary-400 dark:hover:border-primary-500 text-gray-700 dark:text-slate-200 font-semibold rounded-xl text-sm transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                Export
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {% include "components/stats_card.html" with title="Total Exams Taken" value="0" icon="clipboard" color="primary" subtitle="All time" %}
+        {% include "components/stats_card.html" with title="Average Score" value="0%" icon="chart" color="secondary" subtitle="Across all exams" %}
+        {% include "components/stats_card.html" with title="Exams Passed" value="0" icon="check" color="success" subtitle="Score ≥ 50%" %}
+        {% include "components/stats_card.html" with title="Best Score" value="0%" icon="trophy" color="warning" subtitle="Highest achieved" %}
+    </div>
+
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+        <!-- Left: Results Table (2/3) -->
+        <div class="xl:col-span-2 space-y-6">
+
+            <!-- Results Table -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-gray-100 dark:border-slate-700 overflow-hidden">
+                <div class="flex items-center justify-between p-6 border-b border-gray-100 dark:border-slate-700">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900 dark:text-white">Exam Results</h2>
+                        <p class="text-sm text-gray-500 dark:text-slate-400">All your exam scores and grades</p>
+                    </div>
+                    <!-- Search -->
+                    <div class="relative hidden sm:block">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <input type="text" placeholder="Search results..." class="pl-9 pr-4 py-2 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl text-sm text-gray-700 dark:text-slate-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 transition-smooth w-48">
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="p-12 text-center">
+                    <div class="w-20 h-20 bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/30 dark:to-secondary-900/30 rounded-3xl flex items-center justify-center mx-auto mb-5">
+                        <svg class="w-10 h-10 text-primary-500 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-2">No Results Yet</h3>
+                    <p class="text-gray-500 dark:text-slate-400 text-sm max-w-sm mx-auto mb-6">
+                        You haven't taken any exams yet. Complete your first exam to see your results and statistics here.
+                    </p>
+                    <a href="{% url 'exam_page' %}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-semibold rounded-xl text-sm shadow-lg shadow-primary-500/25 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                        </svg>
+                        Take Your First Exam
+                    </a>
+                </div>
+            </div>
+
+            <!-- Subject Performance -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-gray-100 dark:border-slate-700 p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900 dark:text-white">Performance by Subject</h2>
+                        <p class="text-sm text-gray-500 dark:text-slate-400">Average score per subject</p>
+                    </div>
+                    <span class="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-xs font-semibold rounded-full">This Term</span>
+                </div>
+
+                <!-- Placeholder bars -->
+                <div class="space-y-5">
+                    {% for subject_data in subject_stats %}
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-700 dark:text-slate-300">{{ subject_data.name }}</span>
+                            <span class="text-sm font-bold text-primary-600 dark:text-primary-400">{{ subject_data.avg_score }}%</span>
+                        </div>
+                        <div class="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-2.5">
+                            <div class="bg-gradient-to-r from-primary-500 to-secondary-500 h-2.5 rounded-full transition-all duration-1000" style="width: {{ subject_data.avg_score }}%"></div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <!-- No data placeholder -->
+                    <div class="text-center py-8">
+                        <div class="w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded-xl flex items-center justify-center mx-auto mb-3">
+                            <svg class="w-6 h-6 text-gray-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                            </svg>
+                        </div>
+                        <p class="text-sm text-gray-500 dark:text-slate-400">No subject data available yet</p>
+                        <p class="text-xs text-gray-400 dark:text-slate-500 mt-1">Complete exams to see performance by subject</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Summary Cards (1/3) -->
+        <div class="space-y-6">
+
+            <!-- Performance Hero -->
+            <div class="bg-gradient-to-br from-primary-600 via-primary-700 to-secondary-700 rounded-2xl p-6 text-white relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-8 translate-x-8"></div>
+                <div class="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-6 -translate-x-6"></div>
+                <div class="relative z-10">
+                    <p class="text-primary-200 text-sm font-medium mb-2">Overall Performance</p>
+                    <div class="flex items-baseline gap-2 mb-1">
+                        <span class="text-5xl font-bold">—</span>
+                    </div>
+                    <p class="text-primary-200 text-sm mb-5">No exams completed yet</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-white/10 backdrop-blur rounded-xl p-3">
+                            <p class="text-primary-200 text-xs mb-1">Exams Done</p>
+                            <p class="text-white font-bold text-lg">0</p>
+                        </div>
+                        <div class="bg-white/10 backdrop-blur rounded-xl p-3">
+                            <p class="text-primary-200 text-xs mb-1">Pass Rate</p>
+                            <p class="text-white font-bold text-lg">0%</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grade Distribution -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-gray-100 dark:border-slate-700 p-6">
+                <h3 class="text-base font-bold text-gray-900 dark:text-white mb-4">Grade Distribution</h3>
+                <div class="space-y-3">
+                    <!-- A Grade -->
+                    <div class="flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center text-xs font-bold text-success-700 dark:text-success-400 flex-shrink-0">A</span>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs text-gray-500 dark:text-slate-400">80–100%</span>
+                                <span class="text-xs font-semibold text-gray-700 dark:text-slate-300">0</span>
+                            </div>
+                            <div class="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-1.5">
+                                <div class="bg-success-500 h-1.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- B Grade -->
+                    <div class="flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-xs font-bold text-primary-700 dark:text-primary-400 flex-shrink-0">B</span>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs text-gray-500 dark:text-slate-400">65–79%</span>
+                                <span class="text-xs font-semibold text-gray-700 dark:text-slate-300">0</span>
+                            </div>
+                            <div class="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-1.5">
+                                <div class="bg-primary-500 h-1.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- C Grade -->
+                    <div class="flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-warning-100 dark:bg-warning-900/30 flex items-center justify-center text-xs font-bold text-warning-700 dark:text-warning-400 flex-shrink-0">C</span>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs text-gray-500 dark:text-slate-400">50–64%</span>
+                                <span class="text-xs font-semibold text-gray-700 dark:text-slate-300">0</span>
+                            </div>
+                            <div class="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-1.5">
+                                <div class="bg-warning-500 h-1.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- F Grade -->
+                    <div class="flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-danger-100 dark:bg-danger-900/30 flex items-center justify-center text-xs font-bold text-danger-700 dark:text-danger-400 flex-shrink-0">F</span>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs text-gray-500 dark:text-slate-400">0–49%</span>
+                                <span class="text-xs font-semibold text-gray-700 dark:text-slate-300">0</span>
+                            </div>
+                            <div class="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-1.5">
+                                <div class="bg-danger-500 h-1.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-gray-100 dark:border-slate-700 p-6">
+                <h3 class="text-base font-bold text-gray-900 dark:text-white mb-4">Recent Activity</h3>
+                <div class="text-center py-6">
+                    <div class="w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded-xl flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-6 h-6 text-gray-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <p class="text-sm text-gray-500 dark:text-slate-400 font-medium">No recent activity</p>
+                    <p class="text-xs text-gray-400 dark:text-slate-500 mt-1">Your exam activity will appear here</p>
+                </div>
+            </div>
+
+            <!-- Quick Links -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-soft border border-gray-100 dark:border-slate-700 p-6">
+                <h3 class="text-base font-bold text-gray-900 dark:text-white mb-4">Quick Links</h3>
+                <div class="space-y-2">
+                    <a href="{% url 'exam_page' %}" class="flex items-center gap-3 p-3 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-900/10 group transition-smooth">
+                        <div class="w-9 h-9 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center">
+                            <svg class="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                            </svg>
+                        </div>
+                        <span class="text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-smooth flex-1">Take an Exam</span>
+                        <svg class="w-4 h-4 text-gray-400 group-hover:text-primary-500 transition-smooth" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </a>
+                    <a href="{% url 'courses' %}" class="flex items-center gap-3 p-3 rounded-xl hover:bg-secondary-50 dark:hover:bg-secondary-900/10 group transition-smooth">
+                        <div class="w-9 h-9 bg-secondary-100 dark:bg-secondary-900/30 rounded-xl flex items-center justify-center">
+                            <svg class="w-4 h-4 text-secondary-600 dark:text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                            </svg>
+                        </div>
+                        <span class="text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-secondary-700 dark:group-hover:text-secondary-300 transition-smooth flex-1">Browse Subjects</span>
+                        <svg class="w-4 h-4 text-gray-400 group-hover:text-secondary-500 transition-smooth" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </a>
+                    <a href="{% url 'dashboard' %}" class="flex items-center gap-3 p-3 rounded-xl hover:bg-success-50 dark:hover:bg-success-900/10 group transition-smooth">
+                        <div class="w-9 h-9 bg-success-100 dark:bg-success-900/30 rounded-xl flex items-center justify-center">
+                            <svg class="w-4 h-4 text-success-600 dark:text-success-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                            </svg>
+                        </div>
+                        <span class="text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-success-700 dark:group-hover:text-success-300 transition-smooth flex-1">Back to Dashboard</span>
+                        <svg class="w-4 h-4 text-gray-400 group-hover:text-success-500 transition-smooth" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Coming Soon Notice -->
+    <div class="bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 border border-primary-200 dark:border-primary-800 rounded-2xl p-6">
+        <div class="flex items-start gap-4">
+            <div class="w-10 h-10 bg-primary-100 dark:bg-primary-900/40 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-sm font-bold text-primary-800 dark:text-primary-200 mb-1">Advanced Analytics Coming in Phase 5B</h3>
+                <p class="text-sm text-primary-600 dark:text-primary-300">
+                    Interactive charts, trend analysis, comparative performance, and detailed score breakdowns will be available in the next phase. 
+                    Complete exams now to build your data history.
+                </p>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

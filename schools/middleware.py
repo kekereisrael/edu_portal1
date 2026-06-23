@@ -36,6 +36,10 @@ class SchoolContextMiddleware:
         '/api/v1/auth/token/',
     ]
 
+    def _is_api_request(self, request):
+        """Check if this is an API request (vs frontend template)."""
+        return request.path.startswith('/api/')
+
     def __init__(self, get_response):
         self.get_response = get_response
 
@@ -43,6 +47,10 @@ class SchoolContextMiddleware:
         # Initialize school context
         request.school = None
         request.school_membership = None
+
+        # Skip for non-API requests (frontend templates)
+        if not self._is_api_request(request):
+            return self.get_response(request)
 
         # Skip for exempt URLs
         if self._is_exempt(request):

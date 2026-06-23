@@ -131,28 +131,36 @@ def invalidate_school_cache(school_id, resource=None):
         school_id: The school UUID
         resource: Optional specific resource to invalidate
     """
-    if resource:
-        pattern = f"school:{school_id}:{resource}:*"
-    else:
-        pattern = f"school:{school_id}:*"
+    try:
+        if resource:
+            pattern = f"school:{school_id}:{resource}:*"
+        else:
+            pattern = f"school:{school_id}:*"
 
-    # Use cache.delete_pattern if available (django-redis)
-    if hasattr(cache, 'delete_pattern'):
-        cache.delete_pattern(pattern)
-    else:
-        # Fallback: delete known keys
-        _delete_known_keys(school_id, resource)
+        # Use cache.delete_pattern if available (django-redis)
+        if hasattr(cache, 'delete_pattern'):
+            cache.delete_pattern(pattern)
+        else:
+            # Fallback: delete known keys
+            _delete_known_keys(school_id, resource)
+    except Exception:
+        # Silently fail - cache invalidation should never crash the app
+        pass
 
 
 def invalidate_user_cache(user_id, resource=None):
     """Invalidate all cache entries for a user."""
-    if resource:
-        pattern = f"user:{user_id}:{resource}:*"
-    else:
-        pattern = f"user:{user_id}:*"
+    try:
+        if resource:
+            pattern = f"user:{user_id}:{resource}:*"
+        else:
+            pattern = f"user:{user_id}:*"
 
-    if hasattr(cache, 'delete_pattern'):
-        cache.delete_pattern(pattern)
+        if hasattr(cache, 'delete_pattern'):
+            cache.delete_pattern(pattern)
+    except Exception:
+        # Silently fail - cache invalidation should never crash the app
+        pass
 
 
 def _delete_known_keys(school_id, resource=None):

@@ -1,85 +1,423 @@
 {% extends "base_exam.html" %}
-{% block title %}Exam - Question {{ current_question|default:"1" }}{% endblock %}
+{% block title %}{{ exam.title|default:"Exam" }} — EduPortal{% endblock %}
+
+{% block extra_head %}
+<style>
+  .q-nav-btn {
+    width: 2rem; height: 2rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1.5px solid #2d4a5e;
+    background: #1a2332;
+    color: #94a3b8;
+  }
+  .q-nav-btn:hover { border-color: #38bdf8; color: #38bdf8; }
+  .q-nav-btn.answered { background: #38bdf8; border-color: #38bdf8; color: #0f1923; }
+  .q-nav-btn.marked { background: #f59e0b; border-color: #f59e0b; color: #0f1923; }
+  .q-nav-btn.current { border-color: #38bdf8; color: #38bdf8; box-shadow: 0 0 0 2px rgba(56,189,248,0.3); }
+  .option-label { transition: all 0.15s ease; }
+  .option-label:has(input:checked) {
+    background: rgba(56,189,248,0.12);
+    border-color: #38bdf8;
+  }
+  .timer-warning { color: #f59e0b !important; animation: pulse 1s infinite; }
+  .timer-danger { color: #ef4444 !important; animation: pulse 0.5s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl">
-    <!-- Question Content Card -->
-    <div class="bg-exam-card border border-exam-border rounded-2xl p-6 md:p-8">
-        <!-- Question Instructions -->
-        <div class="space-y-4 mb-8">
-            <p class="text-sm text-exam-text leading-relaxed">
-                This question type is known as a multiple choice, select one. This question type contains multiple answer choices and has one correct answer.
-            </p>
-            <p class="text-sm text-exam-text leading-relaxed">
-                There are several varieties of this question type. The number of answer choices may vary, and questions may appear as part of a series or set.
-            </p>
-            <p class="text-sm text-exam-text leading-relaxed">
-                In this question type, you respond to the question by selecting the radio or option button next to your answer.
-            </p>
-        </div>
-
-        <!-- Separator -->
-        <div class="border-t border-exam-border my-6"></div>
-
-        <!-- Actual Question -->
-        <div class="mb-6">
-            <p class="text-sm text-exam-muted mb-3">Here is a sample question:</p>
-            <h3 class="text-base font-semibold text-exam-text mb-6">What is your favorite sound?</h3>
-        </div>
-
-        <!-- Answer Options -->
-        <div class="space-y-4 mb-8">
-            <!-- Option A -->
-            <label class="flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-exam-hover transition-smooth group">
-                <input type="radio" name="answer" value="A" class="w-5 h-5 border-2 border-exam-border text-exam-accent focus:ring-exam-accent focus:ring-offset-0 focus:ring-offset-exam-bg bg-transparent">
-                <span class="text-sm font-semibold text-exam-accent">A.</span>
-                <span class="text-sm text-exam-text">Bell</span>
-            </label>
-
-            <!-- Option B -->
-            <label class="flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-exam-hover transition-smooth group">
-                <input type="radio" name="answer" value="B" class="w-5 h-5 border-2 border-exam-border text-exam-accent focus:ring-exam-accent focus:ring-offset-0 focus:ring-offset-exam-bg bg-transparent">
-                <span class="text-sm font-semibold text-exam-accent">B.</span>
-                <span class="text-sm text-exam-text">Bird</span>
-            </label>
-
-            <!-- Option C -->
-            <label class="flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-exam-hover transition-smooth group">
-                <input type="radio" name="answer" value="C" class="w-5 h-5 border-2 border-exam-border text-exam-accent focus:ring-exam-accent focus:ring-offset-0 focus:ring-offset-exam-bg bg-transparent">
-                <span class="text-sm font-semibold text-exam-accent">C.</span>
-                <span class="text-sm text-exam-text">River</span>
-            </label>
-
-            <!-- Option D -->
-            <label class="flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-exam-hover transition-smooth group">
-                <input type="radio" name="answer" value="D" class="w-5 h-5 border-2 border-exam-border text-exam-accent focus:ring-exam-accent focus:ring-offset-0 focus:ring-offset-exam-bg bg-transparent">
-                <span class="text-sm font-semibold text-exam-accent">D.</span>
-                <span class="text-sm text-exam-text">Whistle</span>
-            </label>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="flex flex-wrap items-center gap-4">
-            <!-- Reset Answer -->
-            <button class="flex items-center gap-2 px-4 py-2 border border-exam-accent text-exam-accent text-sm font-medium rounded-xl hover:bg-exam-accent/10 transition-smooth">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
-                Reset Answer
-            </button>
-
-            <!-- Review Later -->
-            <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" name="review_later" class="w-4 h-4 border-2 border-exam-border rounded text-exam-accent focus:ring-exam-accent bg-transparent">
-                <span class="text-sm text-exam-text">Review later</span>
-            </label>
-
-            <!-- Leave Feedback -->
-            <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" name="leave_feedback" class="w-4 h-4 border-2 border-exam-border rounded text-exam-accent focus:ring-exam-accent bg-transparent">
-                <span class="text-sm text-exam-text">Leave Feedback</span>
-            </label>
-        </div>
+{% if exam and questions %}
+<!-- ── Question Content ─────────────────────────────────── -->
+<div class="max-w-3xl" id="exam-content">
+  {% for question in questions %}
+  <div class="question-panel {% if not forloop.first %}hidden{% endif %}" id="q-panel-{{ forloop.counter }}" data-index="{{ forloop.counter }}">
+    <!-- Question Header -->
+    <div class="flex items-center justify-between mb-4">
+      <span class="text-xs text-exam-muted font-medium uppercase tracking-wide">
+        Question {{ forloop.counter }} of {{ total_questions }}
+        <span class="ml-2 px-2 py-0.5 rounded-full text-xs
+          {% if question.difficulty == 'easy' %}bg-green-900/40 text-green-400
+          {% elif question.difficulty == 'hard' %}bg-red-900/40 text-red-400
+          {% else %}bg-yellow-900/40 text-yellow-400{% endif %}">
+          {{ question.get_difficulty_display }}
+        </span>
+      </span>
+      <span class="text-xs text-exam-muted">{{ question.marks }} mark{% if question.marks != 1 %}s{% endif %}</span>
     </div>
+
+    <!-- Question Card -->
+    <div class="bg-exam-card border border-exam-border rounded-2xl p-6 md:p-8">
+      <!-- Question Text -->
+      <h3 class="text-base font-semibold text-exam-text mb-6 leading-relaxed">{{ question.question_text }}</h3>
+
+      <!-- MCQ Options -->
+      {% if question.question_type == 'mcq' %}
+      <div class="space-y-3" id="options-{{ forloop.counter }}">
+        {% if question.option_a %}
+        <label class="option-label flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-exam-border hover:border-exam-accent/50 hover:bg-exam-hover">
+          <input type="radio" name="q{{ forloop.counter }}" value="A"
+            class="w-4 h-4 border-2 border-exam-border text-exam-accent bg-transparent focus:ring-exam-accent focus:ring-offset-0"
+            onchange="saveAnswer({{ forloop.counter }}, '{{ question.id }}', 'A')">
+          <span class="text-sm font-bold text-exam-accent w-5">A.</span>
+          <span class="text-sm text-exam-text">{{ question.option_a }}</span>
+        </label>
+        {% endif %}
+        {% if question.option_b %}
+        <label class="option-label flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-exam-border hover:border-exam-accent/50 hover:bg-exam-hover">
+          <input type="radio" name="q{{ forloop.counter }}" value="B"
+            class="w-4 h-4 border-2 border-exam-border text-exam-accent bg-transparent focus:ring-exam-accent focus:ring-offset-0"
+            onchange="saveAnswer({{ forloop.counter }}, '{{ question.id }}', 'B')">
+          <span class="text-sm font-bold text-exam-accent w-5">B.</span>
+          <span class="text-sm text-exam-text">{{ question.option_b }}</span>
+        </label>
+        {% endif %}
+        {% if question.option_c %}
+        <label class="option-label flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-exam-border hover:border-exam-accent/50 hover:bg-exam-hover">
+          <input type="radio" name="q{{ forloop.counter }}" value="C"
+            class="w-4 h-4 border-2 border-exam-border text-exam-accent bg-transparent focus:ring-exam-accent focus:ring-offset-0"
+            onchange="saveAnswer({{ forloop.counter }}, '{{ question.id }}', 'C')">
+          <span class="text-sm font-bold text-exam-accent w-5">C.</span>
+          <span class="text-sm text-exam-text">{{ question.option_c }}</span>
+        </label>
+        {% endif %}
+        {% if question.option_d %}
+        <label class="option-label flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-exam-border hover:border-exam-accent/50 hover:bg-exam-hover">
+          <input type="radio" name="q{{ forloop.counter }}" value="D"
+            class="w-4 h-4 border-2 border-exam-border text-exam-accent bg-transparent focus:ring-exam-accent focus:ring-offset-0"
+            onchange="saveAnswer({{ forloop.counter }}, '{{ question.id }}', 'D')">
+          <span class="text-sm font-bold text-exam-accent w-5">D.</span>
+          <span class="text-sm text-exam-text">{{ question.option_d }}</span>
+        </label>
+        {% endif %}
+      </div>
+
+      {% elif question.question_type == 'true_false' %}
+      <!-- True/False Options -->
+      <div class="space-y-3">
+        <label class="option-label flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-exam-border hover:border-exam-accent/50 hover:bg-exam-hover">
+          <input type="radio" name="q{{ forloop.counter }}" value="True"
+            class="w-4 h-4 border-2 border-exam-border text-exam-accent bg-transparent"
+            onchange="saveAnswer({{ forloop.counter }}, '{{ question.id }}', 'True')">
+          <span class="text-sm text-exam-text font-medium">True</span>
+        </label>
+        <label class="option-label flex items-center gap-4 p-3.5 rounded-xl cursor-pointer border border-exam-border hover:border-exam-accent/50 hover:bg-exam-hover">
+          <input type="radio" name="q{{ forloop.counter }}" value="False"
+            class="w-4 h-4 border-2 border-exam-border text-exam-accent bg-transparent"
+            onchange="saveAnswer({{ forloop.counter }}, '{{ question.id }}', 'False')">
+          <span class="text-sm text-exam-text font-medium">False</span>
+        </label>
+      </div>
+
+      {% else %}
+      <!-- Short Answer -->
+      <textarea name="q{{ forloop.counter }}" rows="4"
+        placeholder="Type your answer here..."
+        class="w-full bg-exam-hover border border-exam-border rounded-xl p-3 text-sm text-exam-text placeholder-exam-muted focus:outline-none focus:border-exam-accent resize-none"
+        oninput="saveAnswer({{ forloop.counter }}, '{{ question.id }}', this.value)"></textarea>
+      {% endif %}
+
+      <!-- Action Row -->
+      <div class="flex flex-wrap items-center gap-4 mt-6 pt-4 border-t border-exam-border">
+        <button type="button" onclick="resetAnswer({{ forloop.counter }}, '{{ question.id }}')"
+          class="flex items-center gap-2 px-3 py-1.5 border border-exam-border text-exam-muted text-xs font-medium rounded-lg hover:border-exam-accent hover:text-exam-accent transition-smooth">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Reset
+        </button>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="review-{{ forloop.counter }}"
+            class="w-4 h-4 border-2 border-exam-border rounded text-yellow-400 bg-transparent focus:ring-yellow-400"
+            onchange="toggleReview({{ forloop.counter }}, '{{ question.id }}', this.checked)">
+          <span class="text-xs text-exam-muted">Mark for review</span>
+        </label>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- Bottom Navigation -->
+  <div class="flex items-center justify-between mt-6 gap-3">
+    <button onclick="prevQuestion()" id="btn-prev"
+      class="flex items-center gap-2 px-5 py-2.5 border border-exam-border text-exam-muted text-sm font-medium rounded-xl hover:border-exam-accent hover:text-exam-accent transition-smooth disabled:opacity-30 disabled:cursor-not-allowed">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+      Previous
+    </button>
+
+    <button onclick="confirmSubmit()"
+      class="flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition-smooth">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+      </svg>
+      Submit Exam
+    </button>
+
+    <button onclick="nextQuestion()" id="btn-next"
+      class="flex items-center gap-2 px-5 py-2.5 bg-exam-accent text-exam-sidebar text-sm font-semibold rounded-xl hover:bg-sky-400 transition-smooth">
+      Next
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+      </svg>
+    </button>
+  </div>
 </div>
+
+<!-- Submit Confirmation Modal -->
+<div id="submit-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-exam-card border border-exam-border rounded-2xl p-6 max-w-sm w-full">
+    <div class="text-center mb-5">
+      <div class="w-14 h-14 bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-3">
+        <svg class="w-7 h-7 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+      </div>
+      <h3 class="text-base font-bold text-exam-text">Submit Exam?</h3>
+      <p class="text-sm text-exam-muted mt-1" id="submit-summary">Are you sure you want to submit?</p>
+    </div>
+    <div class="flex gap-3">
+      <button onclick="closeSubmitModal()" class="flex-1 px-4 py-2.5 border border-exam-border text-exam-muted text-sm font-medium rounded-xl hover:border-exam-accent hover:text-exam-accent transition-smooth">
+        Cancel
+      </button>
+      <button onclick="submitExam()" id="final-submit-btn" class="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition-smooth">
+        Submit Now
+      </button>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<!-- No exam / no questions fallback -->
+<div class="max-w-md mx-auto text-center py-20">
+  <div class="w-20 h-20 bg-exam-card rounded-3xl flex items-center justify-center mx-auto mb-4 border border-exam-border">
+    <svg class="w-10 h-10 text-exam-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+    </svg>
+  </div>
+  <h3 class="text-lg font-semibold text-exam-text">No Exam Loaded</h3>
+  <p class="text-sm text-exam-muted mt-1">{{ message|default:"Please select an exam to begin." }}</p>
+  <a href="/exams/" class="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-exam-accent text-exam-sidebar text-sm font-semibold rounded-xl hover:bg-sky-400 transition-smooth">
+    Browse Exams
+  </a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if exam and questions %}
+<script>
+  const CSRF_TOKEN = '{{ csrf_token }}';
+  const EXAM_ID = '{{ exam.id }}';
+  const TOTAL_QUESTIONS = {{ total_questions }};
+  let currentQuestion = 1;
+  let attemptId = null;
+
+  // State tracking
+  const answers = {};    // { qIndex: { questionId, value } }
+  const reviewed = {};   // { qIndex: bool }
+
+  // ── Start exam attempt ───────────────────────────────────
+  async function startAttempt() {
+    try {
+      const resp = await fetch(`/api/v1/exams/${EXAM_ID}/start/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        attemptId = data.attempt_id || data.id;
+      }
+    } catch (e) {
+      console.warn('Could not start attempt:', e);
+    }
+  }
+
+  // ── Save answer ──────────────────────────────────────────
+  async function saveAnswer(qIndex, questionId, value) {
+    answers[qIndex] = { questionId, value };
+    updateNavButton(qIndex);
+
+    if (!attemptId) return;
+    try {
+      await fetch(`/api/v1/exams/attempts/${attemptId}/save/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ question_id: questionId, selected_answer: value }),
+      });
+    } catch (e) {
+      console.warn('Save answer failed:', e);
+    }
+  }
+
+  function resetAnswer(qIndex, questionId) {
+    delete answers[qIndex];
+    const radios = document.querySelectorAll(`input[name="q${qIndex}"]`);
+    radios.forEach(r => r.checked = false);
+    const textarea = document.querySelector(`#q-panel-${qIndex} textarea`);
+    if (textarea) textarea.value = '';
+    updateNavButton(qIndex);
+  }
+
+  // ── Mark for review ──────────────────────────────────────
+  function toggleReview(qIndex, questionId, checked) {
+    reviewed[qIndex] = checked;
+    updateNavButton(qIndex);
+  }
+
+  // ── Navigation ───────────────────────────────────────────
+  function showQuestion(index) {
+    document.querySelectorAll('.question-panel').forEach(p => p.classList.add('hidden'));
+    const panel = document.getElementById(`q-panel-${index}`);
+    if (panel) panel.classList.remove('hidden');
+    currentQuestion = index;
+
+    // Update nav buttons
+    document.querySelectorAll('.q-nav-btn').forEach(btn => btn.classList.remove('current'));
+    const navBtn = document.getElementById(`nav-btn-${index}`);
+    if (navBtn) navBtn.classList.add('current');
+
+    // Prev/Next state
+    document.getElementById('btn-prev').disabled = index === 1;
+    document.getElementById('btn-next').disabled = index === TOTAL_QUESTIONS;
+
+    // Update topbar question counter
+    const counter = document.getElementById('current-q-display');
+    if (counter) counter.textContent = index;
+  }
+
+  function prevQuestion() { if (currentQuestion > 1) showQuestion(currentQuestion - 1); }
+  function nextQuestion() { if (currentQuestion < TOTAL_QUESTIONS) showQuestion(currentQuestion + 1); }
+
+  function updateNavButton(qIndex) {
+    const btn = document.getElementById(`nav-btn-${qIndex}`);
+    if (!btn) return;
+    btn.classList.remove('answered', 'marked');
+    if (reviewed[qIndex]) btn.classList.add('marked');
+    else if (answers[qIndex]) btn.classList.add('answered');
+  }
+
+  // ── Submit ───────────────────────────────────────────────
+  function confirmSubmit() {
+    const answeredCount = Object.keys(answers).length;
+    const unanswered = TOTAL_QUESTIONS - answeredCount;
+    const summaryEl = document.getElementById('submit-summary');
+    if (unanswered > 0) {
+      summaryEl.textContent = `You have ${unanswered} unanswered question${unanswered !== 1 ? 's' : ''}. Unanswered questions will be marked as skipped.`;
+    } else {
+      summaryEl.textContent = 'All questions answered. Ready to submit?';
+    }
+    document.getElementById('submit-modal').classList.remove('hidden');
+  }
+
+  function closeSubmitModal() {
+    document.getElementById('submit-modal').classList.add('hidden');
+  }
+
+  async function submitExam(auto = false) {
+    const btn = document.getElementById('final-submit-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+
+    if (!attemptId) {
+      window.location.href = '/results/';
+      return;
+    }
+
+    try {
+      const answersPayload = Object.values(answers).map(a => ({
+        question_id: a.questionId,
+        selected_answer: a.value,
+      }));
+
+      const resp = await fetch(`/api/v1/exams/attempts/${attemptId}/submit/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ answers: answersPayload, auto_submit: auto }),
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        // Redirect to results
+        window.location.href = `/results/`;
+      } else {
+        window.location.href = '/results/';
+      }
+    } catch {
+      window.location.href = '/results/';
+    }
+  }
+
+  // ── Timer with auto-submit ───────────────────────────────
+  // Override base_exam.html timer to add auto-submit
+  let timeRemaining = {{ exam_duration_seconds|default:3600 }};
+
+  function updateTimer() {
+    const hours = Math.floor(timeRemaining / 3600);
+    const minutes = Math.floor((timeRemaining % 3600) / 60);
+    const seconds = timeRemaining % 60;
+
+    const display = document.getElementById('timer-display');
+    if (display) {
+      display.textContent = `${String(hours).padStart(2,'0')} : ${String(minutes).padStart(2,'0')} : ${String(seconds).padStart(2,'0')}`;
+      // Warning colors
+      display.classList.remove('timer-warning', 'timer-danger');
+      if (timeRemaining <= 60) display.classList.add('timer-danger');
+      else if (timeRemaining <= 300) display.classList.add('timer-warning');
+    }
+
+    if (timeRemaining > 0) {
+      timeRemaining--;
+      setTimeout(updateTimer, 1000);
+    } else {
+      // Auto-submit
+      closeSubmitModal();
+      const modal = document.getElementById('submit-modal');
+      if (modal) {
+        document.getElementById('submit-summary').textContent = 'Time is up! Your exam is being submitted automatically.';
+        modal.classList.remove('hidden');
+        if (document.getElementById('final-submit-btn')) {
+          document.getElementById('final-submit-btn').textContent = 'Auto-submitting...';
+        }
+      }
+      submitExam(true);
+    }
+  }
+
+  // ── Build question navigator in sidebar ─────────────────
+  function buildNavigator() {
+    const container = document.getElementById('question-navigator');
+    if (!container) return;
+    container.innerHTML = '';
+    for (let i = 1; i <= TOTAL_QUESTIONS; i++) {
+      const btn = document.createElement('button');
+      btn.id = `nav-btn-${i}`;
+      btn.className = 'q-nav-btn' + (i === 1 ? ' current' : '');
+      btn.textContent = i;
+      btn.onclick = () => showQuestion(i);
+      container.appendChild(btn);
+    }
+  }
+
+  // ── Init ─────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    buildNavigator();
+    showQuestion(1);
+    startAttempt();
+    updateTimer();
+  });
+
+  // Prevent accidental navigation away
+  window.addEventListener('beforeunload', (e) => {
+    if (attemptId) {
+      e.preventDefault();
+      e.returnValue = 'Your exam is in progress. Are you sure you want to leave?';
+    }
+  });
+</script>
+{% endif %}
 {% endblock %}

@@ -149,3 +149,14 @@ class TokenResponseSerializer(serializers.Serializer):
     access = serializers.CharField()
     refresh = serializers.CharField()
     user = UserSerializer()
+
+
+class UserBasicSerializer(serializers.ModelSerializer):
+    """Minimal user serializer used by nested representations (e.g. student lists)."""
+
+    full_name = serializers.ReadOnlyField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'first_name', 'last_name', 'full_name', 'role', 'avatar']
+        read_only_fields = fields

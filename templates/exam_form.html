@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{% if exam %}Edit Exam{% else %}Create Exam{% endif %} — EduPortal{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+  <!-- Page Header -->
+  <div class="flex items-center gap-4">
+    <a href="/exams/" class="btn btn-ghost btn-sm btn-circle rounded-xl">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+        {% if exam %}Edit Exam{% else %}Create New Exam{% endif %}
+      </h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+        {% if exam %}Update exam details and settings{% else %}Set up a new exam for your students{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <!-- Form Card -->
+  <div class="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-soft overflow-hidden">
+    <div class="bg-gradient-to-r from-primary-600 to-secondary-600 px-6 py-4">
+      <p class="text-white font-medium text-sm">
+        {% if exam %}Editing: {{ exam.title }}{% else %}New Exam Details{% endif %}
+      </p>
+    </div>
+
+    <form id="exam-form" class="p-6 space-y-6" onsubmit="submitExamForm(event)">
+      <!-- Basic Info -->
+      <div class="space-y-4">
+        <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide border-b border-gray-100 dark:border-slate-700 pb-2">Basic Information</h2>
+
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Exam Title *</span></label>
+          <input type="text" id="exam-title" value="{{ exam.title|default:'' }}"
+            placeholder="e.g. Mathematics Mid-Term Examination"
+            class="input input-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full" required>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Subject *</span></label>
+            <select id="exam-subject" class="select select-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full" required>
+              <option value="">Select subject</option>
+              {% for subject in subjects %}
+              <option value="{{ subject.id }}" {% if exam and exam.subject.id == subject.id %}selected{% endif %}>{{ subject.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Exam Type *</span></label>
+            <select id="exam-type" class="select select-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full" required>
+              <option value="cbt" {% if exam and exam.exam_type == 'cbt' %}selected{% endif %}>Computer-Based Test (CBT)</option>
+              <option value="quiz" {% if exam and exam.exam_type == 'quiz' %}selected{% endif %}>Quiz</option>
+              <option value="practice" {% if exam and exam.exam_type == 'practice' %}selected{% endif %}>Practice Test</option>
+              <option value="assignment" {% if exam and exam.exam_type == 'assignment' %}selected{% endif %}>Assignment</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-control">
+          <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Instructions</span></label>
+          <textarea id="exam-instructions" rows="3"
+            placeholder="Enter exam instructions for students (e.g. Answer all questions. Each question carries 1 mark...)"
+            class="textarea textarea-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full resize-none">{{ exam.instructions|default:'' }}</textarea>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div class="space-y-4">
+        <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide border-b border-gray-100 dark:border-slate-700 pb-2">Exam Settings</h2>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Duration (minutes) *</span></label>
+            <input type="number" id="exam-duration" value="{{ exam.duration_minutes|default:60 }}" min="1" max="480"
+              class="input input-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full" required>
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Passing Score (%) *</span></label>
+            <input type="number" id="exam-passing-score" value="{{ exam.passing_score|default:50 }}" min="0" max="100" step="0.5"
+              class="input input-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full" required>
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Max Attempts</span></label>
+            <input type="number" id="exam-max-attempts" value="{{ exam.max_attempts|default:1 }}" min="0" max="10"
+              class="input input-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full">
+            <label class="label"><span class="label-text-alt text-gray-400">0 = unlimited</span></label>
+          </div>
+        </div>
+
+        <!-- Availability Window -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">Start Date & Time</span></label>
+            <input type="datetime-local" id="exam-start-date"
+              value="{% if exam and exam.start_date %}{{ exam.start_date|date:'Y-m-d' }}T{{ exam.start_date|date:'H:i' }}{% endif %}"
+              class="input input-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full">
+          </div>
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium text-gray-700 dark:text-gray-300">End Date & Time</span></label>
+            <input type="datetime-local" id="exam-end-date"
+              value="{% if exam and exam.end_date %}{{ exam.end_date|date:'Y-m-d' }}T{{ exam.end_date|date:'H:i' }}{% endif %}"
+              class="input input-bordered rounded-xl bg-gray-50 dark:bg-slate-700 border-gray-200 dark:border-slate-600 w-full">
+          </div>
+        </div>
+
+        <!-- Toggle Options -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-slate-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+            <input type="checkbox" id="exam-shuffle-questions" class="checkbox checkbox-primary rounded-lg"
+              {% if exam and exam.shuffle_questions %}checked{% endif %}>
+            <div>
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Shuffle Questions</p>
+              <p class="text-xs text-gray-400 dark:text-gray-500">Randomize question order for each student</p>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-slate-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+            <input type="checkbox" id="exam-shuffle-options" class="checkbox checkbox-primary rounded-lg"
+              {% if exam and exam.shuffle_options %}checked{% endif %}>
+            <div>
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Shuffle Options</p>
+              <p class="text-xs text-gray-400 dark:text-gray-500">Randomize answer options for MCQ questions</p>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-slate-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+            <input type="checkbox" id="exam-show-result" class="checkbox checkbox-primary rounded-lg"
+              {% if not exam or exam.show_result_immediately %}checked{% endif %}>
+            <div>
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Show Result Immediately</p>
+              <p class="text-xs text-gray-400 dark:text-gray-500">Display score right after submission</p>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-slate-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+            <input type="checkbox" id="exam-allow-review" class="checkbox checkbox-primary rounded-lg"
+              {% if not exam or exam.allow_review %}checked{% endif %}>
+            <div>
+              <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Allow Answer Review</p>
+              <p class="text-xs text-gray-400 dark:text-gray-500">Students can review answers after submission</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Error message -->
+      <div id="exam-error" class="hidden alert alert-error rounded-xl text-sm py-3"></div>
+
+      <!-- Action Buttons -->
+      <div class="flex flex-col sm:flex-row gap-3 pt-2">
+        <a href="/exams/" class="btn btn-ghost flex-1 rounded-xl">Cancel</a>
+        <button type="submit" name="action" value="save" id="save-btn"
+          class="btn btn-outline btn-primary flex-1 rounded-xl gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+          </svg>
+          Save as Draft
+        </button>
+        <button type="submit" name="action" value="save_questions" id="save-questions-btn"
+          class="btn btn-primary flex-1 rounded-xl gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+          Save & Add Questions
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Quick Tips -->
+  <div class="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 border border-blue-100 dark:border-blue-800">
+    <div class="flex gap-3">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <div>
+        <p class="text-sm font-medium text-blue-700 dark:text-blue-300">Tips for creating a great exam</p>
+        <ul class="text-xs text-blue-600 dark:text-blue-400 mt-1 space-y-1 list-disc list-inside">
+          <li>Set a clear title that describes the exam scope</li>
+          <li>Add detailed instructions so students know what to expect</li>
+          <li>After saving, add questions using the Question Builder</li>
+          <li>Publish the exam only when all questions are ready</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const CSRF_TOKEN = '{{ csrf_token }}';
+  const EXAM_ID = '{{ exam.id|default:"" }}';
+  let pendingAction = 'save';
+
+  // Track which button was clicked
+  document.querySelectorAll('[name="action"]').forEach(btn => {
+    btn.addEventListener('click', () => { pendingAction = btn.value; });
+  });
+
+  async function submitExamForm(e) {
+    e.preventDefault();
+    const errDiv = document.getElementById('exam-error');
+    errDiv.classList.add('hidden');
+
+    const saveBtn = document.getElementById('save-btn');
+    const sqBtn = document.getElementById('save-questions-btn');
+    saveBtn.disabled = true;
+    sqBtn.disabled = true;
+    sqBtn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Saving...';
+
+    const isEdit = !!EXAM_ID;
+    const url = isEdit ? `/api/v1/exams/${EXAM_ID}/` : '/api/v1/exams/';
+    const method = isEdit ? 'PATCH' : 'POST';
+
+    const startDate = document.getElementById('exam-start-date').value;
+    const endDate = document.getElementById('exam-end-date').value;
+
+    const payload = {
+      title: document.getElementById('exam-title').value,
+      subject: document.getElementById('exam-subject').value,
+      exam_type: document.getElementById('exam-type').value,
+      instructions: document.getElementById('exam-instructions').value,
+      duration_minutes: parseInt(document.getElementById('exam-duration').value),
+      passing_score: parseFloat(document.getElementById('exam-passing-score').value),
+      max_attempts: parseInt(document.getElementById('exam-max-attempts').value),
+      shuffle_questions: document.getElementById('exam-shuffle-questions').checked,
+      shuffle_options: document.getElementById('exam-shuffle-options').checked,
+      show_result_immediately: document.getElementById('exam-show-result').checked,
+      allow_review: document.getElementById('exam-allow-review').checked,
+    };
+    if (startDate) payload.start_date = new Date(startDate).toISOString();
+    if (endDate) payload.end_date = new Date(endDate).toISOString();
+
+    try {
+      const resp = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': CSRF_TOKEN,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        const examId = data.id || EXAM_ID;
+        if (pendingAction === 'save_questions') {
+          window.location.href = `/exams/${examId}/questions/`;
+        } else {
+          window.location.href = '/exams/';
+        }
+      } else {
+        const data = await resp.json();
+        const msg = Object.entries(data).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
+        errDiv.textContent = msg || 'Failed to save exam.';
+        errDiv.classList.remove('hidden');
+      }
+    } catch {
+      errDiv.textContent = 'Network error. Please try again.';
+      errDiv.classList.remove('hidden');
+    } finally {
+      saveBtn.disabled = false;
+      sqBtn.disabled = false;
+      sqBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg> Save & Add Questions';
+    }
+  }
+</script>
+{% endblock %}
