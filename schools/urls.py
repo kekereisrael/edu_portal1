@@ -117,4 +117,64 @@ urlpatterns = [
     path('students/', views.StudentListCreateView.as_view(), name='student_list'),
     path('students/bulk-upload/', views.StudentBulkUploadView.as_view(), name='student_bulk_upload'),
     path('students/<uuid:membership_id>/', views.StudentDetailView.as_view(), name='student_detail'),
+
+    # ══ PHASE 7B — TASK 1: Platform Landing Page API ═══════════════════════════
+    # GET  /api/v1/schools/platform/info/       — platform features + pricing
+    # POST /api/v1/schools/platform/book-demo/  — book a demo
+    path('platform/info/', views.PlatformInfoView.as_view(), name='platform_info'),
+    path('platform/book-demo/', views.BookDemoView.as_view(), name='book_demo'),
+
+    # ══ PHASE 7B — TASK 2: Registration Review ════════════════════════════════
+    # GET /api/v1/schools/register/<id>/review/  — review all onboarding data
+    path('register/<uuid:registration_id>/review/', views.RegistrationReviewView.as_view(), name='registration_review'),
+
+    # ══ PHASE 7B — TASK 3: Enhanced Dashboard ════════════════════════════════
+    # GET /api/v1/schools/dashboard/enhanced/  — rich stats + quick actions + activity
+    path('dashboard/enhanced/', views.EnhancedSchoolDashboardView.as_view(), name='enhanced_dashboard'),
+
+    # ══ PHASE 7B — TASK 4: Bulk Import ════════════════════════════════════════
+    # POST /api/v1/schools/import/               — upload CSV/Excel file
+    # GET  /api/v1/schools/import/template/      — download CSV template
+    path('import/', views.BulkImportView.as_view(), name='bulk_import'),
+    path('import/template/', views.BulkImportTemplateView.as_view(), name='bulk_import_template'),
+
+    # ══ PHASE 7B — TASK 5: Class Promotion Engine ═════════════════════════════
+    # POST /api/v1/schools/promotions/preview/          — dry-run preview
+    # POST /api/v1/schools/promotions/apply/            — apply promotion
+    # GET  /api/v1/schools/promotions/                  — list all promotions
+    # POST /api/v1/schools/promotions/<id>/undo/        — undo a promotion
+    path('promotions/', views.PromotionReportView.as_view(), name='promotion_report'),
+    path('promotions/preview/', views.PromotionPreviewView.as_view(), name='promotion_preview'),
+    path('promotions/apply/', views.PromotionApplyView.as_view(), name='promotion_apply'),
+    path('promotions/<uuid:promotion_id>/undo/', views.PromotionUndoView.as_view(), name='promotion_undo'),
+
+    # ══ PHASE 7B — TASK 6: School Branding Engine ═════════════════════════════
+    # GET   /api/v1/schools/branding/  — retrieve branding context
+    # PATCH /api/v1/schools/branding/  — update branding fields
+    path('branding/', views.SchoolBrandingView.as_view(), name='school_branding'),
+
+    # ══ PHASE 7B — TASK 7: Document Generator ═════════════════════════════════
+    # GET /api/v1/schools/documents/id-card/<student_id>/
+    # GET /api/v1/schools/documents/result-sheet/<student_id>/
+    # GET /api/v1/schools/documents/report-card/<student_id>/
+    # GET /api/v1/schools/documents/exam-slip/<student_id>/
+    # GET /api/v1/schools/documents/certificate/<student_id>/
+    # All support ?format=pdf for PDF download
+    path('documents/id-card/<uuid:student_id>/', views.StudentIDCardView.as_view(), name='document_id_card'),
+    path('documents/result-sheet/<uuid:student_id>/', views.ResultSheetView.as_view(), name='document_result_sheet'),
+    path('documents/report-card/<uuid:student_id>/', views.ReportCardView.as_view(), name='document_report_card'),
+    path('documents/exam-slip/<uuid:student_id>/', views.ExamSlipView.as_view(), name='document_exam_slip'),
+    path('documents/certificate/<uuid:student_id>/', views.CertificateView.as_view(), name='document_certificate'),
+
+    # ══ PHASE 7B — TASK 8: Audit Logs ═════════════════════════════════════════
+    # GET /api/v1/schools/audit-logs/  — paginated audit trail
+    path('audit-logs/', views.AuditLogListView.as_view(), name='audit_logs'),
+
+    # ══ PHASE 7B — TASK 9: School Settings Module ═════════════════════════════
+    # GET   /api/v1/schools/settings/full/     — full school settings
+    # PATCH /api/v1/schools/settings/full/     — update school info + settings
+    # GET   /api/v1/schools/settings/grading/  — grading scale + pass mark
+    # PUT   /api/v1/schools/settings/grading/  — replace grading scale
+    path('settings/full/', views.SchoolSettingsDetailView.as_view(), name='settings_full'),
+    path('settings/grading/', views.GradingScaleView.as_view(), name='settings_grading'),
 ]

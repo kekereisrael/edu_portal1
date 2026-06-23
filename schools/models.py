@@ -761,6 +761,216 @@ class SchoolVerificationToken(models.Model):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# PHASE 7B — SCHOOL BRANDING
+# ─────────────────────────────────────────────────────────────────────────────
+
+class SchoolBranding(models.Model):
+    """
+    Extended branding configuration for a school.
+    Applied to login pages, dashboards, PDFs, certificates, and reports.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.OneToOneField(
+        School, on_delete=models.CASCADE, related_name='branding'
+    )
+    # ── Visual identity ───────────────────────────────────────────────────────
+    logo            = models.ImageField(upload_to='schools/branding/logos/', blank=True, null=True)
+    favicon         = models.ImageField(upload_to='schools/branding/favicons/', blank=True, null=True)
+    primary_color   = models.CharField(max_length=10, default='#1A73E8')
+    secondary_color = models.CharField(max_length=10, default='#FFFFFF')
+    accent_color    = models.CharField(max_length=10, default='#F4B400')
+    # ── Text identity ─────────────────────────────────────────────────────────
+    motto           = models.CharField(max_length=255, blank=True, null=True)
+    tagline         = models.CharField(max_length=255, blank=True, null=True)
+    # ── Document headers ──────────────────────────────────────────────────────
+    report_header_text   = models.TextField(
+        blank=True, null=True,
+        help_text='Text shown at the top of result sheets and report cards',
+    )
+    certificate_header_text = models.TextField(
+        blank=True, null=True,
+        help_text='Text shown at the top of certificates',
+    )
+    report_footer_text   = models.TextField(blank=True, null=True)
+    certificate_footer_text = models.TextField(blank=True, null=True)
+    # ── Signature ─────────────────────────────────────────────────────────────
+    principal_signature = models.ImageField(
+        upload_to='schools/branding/signatures/', blank=True, null=True
+    )
+    stamp_image = models.ImageField(
+        upload_to='schools/branding/stamps/', blank=True, null=True
+    )
+    # ── Timestamps ────────────────────────────────────────────────────────────
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'school branding'
+        verbose_name_plural = 'school brandings'
+
+    def __str__(self):
+        return f'Branding for {self.school.name}'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PHASE 7B — CLASS PROMOTION
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ClassPromotion(models.Model):
+    """
+    Records a batch class promotion event for a school.
+    Tracks which students were promoted, from which session to which session.
+    """
+
+    class Status(models.TextChoices):
+        PREVIEW    = 'preview',    'Preview (Not Applied)'
+        APPLIED    = 'applied',    'Applied'
+        UNDONE     = 'undone',     'Undone'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey(
+        School, on_delete=models.CASCADE, related_name='class_promotions', db_index=True
+    )
+    from_session = models.ForeignKey(
+        AcademicSession,
+        on_delete=models.PROTECT,
+        related_name='promotions_from',
+        help_text='Session students are being promoted FROM',
+    )
+    to_session = models.ForeignKey(
+        AcademicSession,
+        on_delete=models.PROTECT,
+        related_name='promotions_to',
+        help_text='Session students are being promoted TO',
+    )
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.PREVIEW, db_index=True
+    )
+    promoted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='class_promotions_made',
+    )
+    # JSON summary: { "promoted": 45, "graduated": 12, "skipped": 3, "details": [...] }
+    summary = models.JSONField(default=dict, blank=True)
+    notes   = models.TextField(blank=True, null=True)
+    created_at  = models.DateTimeField(auto_now_add=True, db_index=True)
+    applied_at  = models.DateTimeField(null=True, blank=True)
+    undone_at   = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'class promotion'
+        verbose_name_plural = 'class promotions'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return (
+            f'{self.school.name}: {self.from_session.name} → {self.to_session.name} '
+            f'({self.status})'
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PHASE 7B — AUDIT LOG
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AuditLog(models.Model):
+    """
+    Immutable audit trail for all important school actions.
+    Records who did what, when, from which IP, in which school.
+    """
+
+    class Action(models.TextChoices):
+        # User management
+        STUDENT_CREATED   = 'student_created',   'Student Created'
+        STUDENT_UPDATED   = 'student_updated',   'Student Updated'
+        STUDENT_DELETED   = 'student_deleted',   'Student Deleted'
+        TEACHER_CREATED   = 'teacher_created',   'Teacher Created'
+        TEACHER_UPDATED   = 'teacher_updated',   'Teacher Updated'
+        TEACHER_DELETED   = 'teacher_deleted',   'Teacher Deleted'
+        PARENT_CREATED    = 'parent_created',    'Parent Created'
+        PARENT_UPDATED    = 'parent_updated',    'Parent Updated'
+        PARENT_DELETED    = 'parent_deleted',    'Parent Deleted'
+        PARENT_LINKED     = 'parent_linked',     'Parent Linked to Student'
+        PARENT_UNLINKED   = 'parent_unlinked',   'Parent Unlinked from Student'
+        # Academic
+        EXAM_CREATED      = 'exam_created',      'Exam Created'
+        EXAM_PUBLISHED    = 'exam_published',    'Exam Published'
+        EXAM_DELETED      = 'exam_deleted',      'Exam Deleted'
+        RESULT_MODIFIED   = 'result_modified',   'Result Modified'
+        RESULT_PUBLISHED  = 'result_published',  'Result Published'
+        CLASS_PROMOTED    = 'class_promoted',    'Class Promoted'
+        CLASS_PROMOTION_UNDONE = 'class_promotion_undone', 'Class Promotion Undone'
+        # School management
+        SCHOOL_SETTINGS_UPDATED = 'school_settings_updated', 'School Settings Updated'
+        BRANDING_UPDATED  = 'branding_updated',  'School Branding Updated'
+        MEMBER_ADDED      = 'member_added',      'Member Added'
+        MEMBER_REMOVED    = 'member_removed',    'Member Removed'
+        BULK_IMPORT       = 'bulk_import',       'Bulk Import'
+        DOCUMENT_GENERATED = 'document_generated', 'Document Generated'
+        # Auth
+        LOGIN             = 'login',             'User Login'
+        LOGOUT            = 'logout',            'User Logout'
+        PASSWORD_CHANGED  = 'password_changed',  'Password Changed'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school = models.ForeignKey(
+        School,
+        on_delete=models.CASCADE,
+        related_name='audit_logs',
+        db_index=True,
+        null=True,
+        blank=True,
+        help_text='Null for platform-level actions',
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='audit_logs',
+        help_text='User who performed the action',
+    )
+    action = models.CharField(
+        max_length=50, choices=Action.choices, db_index=True
+    )
+    target_type = models.CharField(
+        max_length=100, blank=True, null=True,
+        help_text='Model name of the affected object, e.g. "User", "Exam"',
+    )
+    target_id = models.CharField(
+        max_length=100, blank=True, null=True,
+        help_text='PK of the affected object',
+    )
+    target_repr = models.CharField(
+        max_length=255, blank=True, null=True,
+        help_text='Human-readable description of the target',
+    )
+    # Extra context (before/after values, import stats, etc.)
+    metadata = models.JSONField(default=dict, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'audit log'
+        verbose_name_plural = 'audit logs'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['school', 'action', 'created_at'], name='idx_audit_school_action'),
+            models.Index(fields=['actor', 'created_at'], name='idx_audit_actor'),
+            models.Index(fields=['target_type', 'target_id'], name='idx_audit_target'),
+        ]
+
+    def __str__(self):
+        actor_str = self.actor.email if self.actor else 'system'
+        return f'[{self.created_at:%Y-%m-%d %H:%M}] {actor_str} → {self.action}'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # PHASE 7B — PARENT PORTAL
 # ─────────────────────────────────────────────────────────────────────────────
 

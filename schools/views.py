@@ -13,6 +13,7 @@ from .models import (
     School, SchoolMembership, SchoolSettings,
     AcademicSession, AcademicYear, Term,
     Department, ClassRoom, ClassLevel, StudentClassAssignment,
+    SchoolBranding, ClassPromotion, AuditLog,
 )
 from .permissions import HasSchoolContext, IsSchoolAdmin, IsPlatformAdmin
 from .serializers import (
@@ -2010,3 +2011,819 @@ class StudentBulkUploadView(APIView):
                 results['errors'].append({'index': idx, 'email': email, 'reason': str(exc)})
 
         return Response(results, status=status.HTTP_201_CREATED)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PHASE 7B VIEWS — PART 1 (Tasks 1-5)
+# Appended to schools/views.py
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class PlatformInfoView(APIView):
+    """
+    GET /api/v1/schools/platform/info/
+    Public endpoint — returns platform features, stats, and pricing tiers.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        return Response({
+            'platform': {
+                'name': 'Examind',
+                'tagline': 'The all-in-one school management platform for Nigerian secondary schools.',
+                'version': '2.0',
+            },
+            'features': [
+                {'id': 'multi_school',    'title': 'Multi-School Management', 'description': 'Manage multiple schools from a single platform.',                      'icon': 'school'},
+                {'id': 'exam_engine',     'title': 'CBT Exam Engine',         'description': 'Create, schedule, and auto-grade computer-based tests.',               'icon': 'quiz'},
+                {'id': 'result_mgmt',     'title': 'Result Management',       'description': 'Generate result sheets, report cards, and transcripts.',               'icon': 'assessment'},
+                {'id': 'class_promotion', 'title': 'Class Promotion Engine',  'description': 'Bulk-promote students from JSS1 to SSS3 with one click.',              'icon': 'upgrade'},
+                {'id': 'parent_portal',   'title': 'Parent Portal',           'description': 'Parents can view results, attendance, and communicate with teachers.', 'icon': 'family_restroom'},
+                {'id': 'bulk_import',     'title': 'Bulk Import',             'description': 'Import students, teachers, and parents via CSV or Excel.',             'icon': 'upload_file'},
+                {'id': 'branding',        'title': 'School Branding',         'description': 'Customise your school portal with your logo, colours, and motto.',     'icon': 'palette'},
+                {'id': 'audit_logs',      'title': 'Audit Logs',              'description': 'Full audit trail of all actions performed in your school.',            'icon': 'history'},
+            ],
+            'stats': {
+                'schools_onboarded': 0,
+                'students_managed':  0,
+                'exams_conducted':   0,
+            },
+            'pricing': [
+                {
+                    'tier': 'starter', 'name': 'Starter', 'price_ngn': 0,
+                    'price_label': 'Free', 'max_students': 100,
+                    'features': ['CBT Exams', 'Result Management', 'Up to 100 students'],
+                },
+                {
+                    'tier': 'school', 'name': 'School', 'price_ngn': 50000,
+                    'price_label': '\u20a650,000/term', 'max_students': 1000,
+                    'features': ['Everything in Starter', 'Parent Portal', 'Bulk Import', 'Branding', 'Up to 1,000 students'],
+                },
+                {
+                    'tier': 'enterprise', 'name': 'Enterprise', 'price_ngn': None,
+                    'price_label': 'Contact us', 'max_students': None,
+                    'features': ['Everything in School', 'Multi-school', 'Dedicated support', 'Custom integrations'],
+                },
+            ],
+        })
+
+
+class BookDemoView(APIView):
+    """
+    POST /api/v1/schools/platform/book-demo/
+    Public endpoint — records a demo booking request.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        name    = request.data.get('name', '').strip()
+        email   = request.data.get('email', '').strip()
+        phone   = request.data.get('phone', '').strip()
+        school  = request.data.get('school_name', '').strip()
+        message = request.data.get('message', '').strip()
+
+        if not name or not email:
+            return Response({'detail': 'name and email are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from core.services.audit_service import log_action, AuditAction
+        log_action(
+            action=AuditAction.LOGIN,
+            actor=None, school=None,
+            target_type='DemoRequest', target_repr=f'{name} <{email}>',
+            metadata={'name': name, 'email': email, 'phone': phone, 'school_name': school, 'message': message},
+            request=request,
+        )
+        return Response(
+            {'detail': 'Demo request received. Our team will contact you within 24 hours.', 'name': name, 'email': email},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class RegistrationReviewView(APIView):
+    """
+    GET /api/v1/schools/register/<registration_id>/review/
+    Returns a summary of all onboarding data collected so far.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, registration_id):
+        from .models import SchoolRegistration
+        try:
+            reg = SchoolRegistration.objects.get(id=registration_id)
+        except SchoolRegistration.DoesNotExist:
+            return Response({'detail': 'Registration not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        data = reg.onboarding_data or {}
+        return Response({
+            'registration_id': str(reg.id),
+            'status':          reg.status,
+            'email':           reg.email,
+            'email_verified':  reg.email_verified,
+            'steps_completed': reg.steps_completed,
+            'review': {
+                'school_name':               data.get('school_name', ''),
+                'school_type':               data.get('school_type', ''),
+                'phone':                     data.get('phone', ''),
+                'address':                   data.get('address', ''),
+                'city':                      data.get('city', ''),
+                'state':                     data.get('state', ''),
+                'country':                   data.get('country', 'Nigeria'),
+                'website':                   data.get('website', ''),
+                'primary_color':             data.get('primary_color', '#1A73E8'),
+                'secondary_color':           data.get('secondary_color', '#FFFFFF'),
+                'motto':                     data.get('motto', ''),
+                'academic_year_start_month': data.get('academic_year_start_month', 9),
+                'grading_system':            data.get('grading_system', 'percentage'),
+                'admin_first_name':          data.get('admin_first_name', ''),
+                'admin_last_name':           data.get('admin_last_name', ''),
+                'admin_email':               data.get('admin_email', reg.email),
+            },
+            'created_at': reg.created_at.isoformat(),
+        })
+
+
+class EnhancedSchoolDashboardView(APIView):
+    """
+    GET /api/v1/schools/dashboard/enhanced/
+    Rich dashboard: stats + quick actions + recent activity.
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get(self, request):
+        school = request.school
+        from core.services.audit_service import get_recent_activity
+        from core.services.school_settings_service import get_current_session, get_current_term
+
+        total_students   = SchoolMembership.objects.filter(school=school, role=SchoolMembership.SchoolRole.STUDENT, is_active=True).count()
+        total_teachers   = SchoolMembership.objects.filter(school=school, role=SchoolMembership.SchoolRole.TEACHER, is_active=True).count()
+        total_classrooms = ClassRoom.objects.filter(school=school, is_active=True).count()
+
+        current_session = get_current_session(school)
+        current_term    = get_current_term(school)
+
+        enrolled_this_session = 0
+        if current_session:
+            enrolled_this_session = StudentClassAssignment.objects.filter(
+                school=school,
+                academic_session=current_session,
+                status=StudentClassAssignment.Status.ACTIVE,
+            ).count()
+
+        return Response({
+            'school': {
+                'id':          str(school.id),
+                'name':        school.name,
+                'slug':        school.slug,
+                'logo_url':    school.logo.url if school.logo else None,
+                'school_type': school.school_type,
+            },
+            'stats': {
+                'total_students':        total_students,
+                'total_teachers':        total_teachers,
+                'total_classrooms':      total_classrooms,
+                'enrolled_this_session': enrolled_this_session,
+            },
+            'current_session': {
+                'id':   str(current_session.id) if current_session else None,
+                'name': current_session.name    if current_session else None,
+            },
+            'current_term': {
+                'id':   str(current_term.id) if current_term else None,
+                'name': current_term.name    if current_term else None,
+            },
+            'quick_actions': [
+                {'id': 'add_student',     'label': 'Add Student',     'url': '/schools/students/',         'icon': 'person_add'},
+                {'id': 'add_teacher',     'label': 'Add Teacher',     'url': '/schools/teachers/',         'icon': 'school'},
+                {'id': 'bulk_import',     'label': 'Bulk Import',     'url': '/schools/import/',           'icon': 'upload_file'},
+                {'id': 'promote_class',   'label': 'Promote Classes', 'url': '/schools/promotions/apply/', 'icon': 'upgrade'},
+                {'id': 'view_results',    'label': 'View Results',    'url': '/results/',                  'icon': 'assessment'},
+                {'id': 'school_settings', 'label': 'Settings',        'url': '/schools/settings/full/',    'icon': 'settings'},
+            ],
+            'recent_activity': get_recent_activity(school, limit=10),
+        })
+
+
+class BulkImportView(APIView):
+    """
+    POST /api/v1/schools/import/
+    Accepts a CSV or Excel file and imports students, teachers, or parents.
+    Form fields: file, import_type ('students'|'teachers'|'parents')
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def post(self, request):
+        school      = request.school
+        import_type = request.data.get('import_type', 'students').lower()
+        file_obj    = request.FILES.get('file')
+
+        if not file_obj:
+            return Response({'detail': 'No file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+        if import_type not in ('students', 'teachers', 'parents'):
+            return Response({'detail': 'import_type must be students, teachers, or parents.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        rows, parse_error = self._parse_file(file_obj)
+        if parse_error:
+            return Response({'detail': parse_error}, status=status.HTTP_400_BAD_REQUEST)
+
+        if import_type == 'students':
+            result = self._import_students(rows, school)
+        elif import_type == 'teachers':
+            result = self._import_teachers(rows, school)
+        else:
+            result = self._import_parents(rows, school)
+
+        from core.services.audit_service import log_action, AuditAction
+        log_action(
+            action=AuditAction.BULK_IMPORT, actor=request.user, school=school, request=request,
+            metadata={
+                'import_type': import_type,
+                'created': len(result.get('created', [])),
+                'updated': len(result.get('updated', [])),
+                'errors':  len(result.get('errors', [])),
+            },
+        )
+        return Response(result, status=status.HTTP_200_OK)
+
+    def _parse_file(self, file_obj):
+        filename = file_obj.name.lower()
+        try:
+            if filename.endswith('.xlsx') or filename.endswith('.xls'):
+                return self._parse_excel(file_obj)
+            return self._parse_csv(file_obj)
+        except Exception as exc:
+            return [], f'File parse error: {exc}'
+
+    def _parse_csv(self, file_obj):
+        import csv, io
+        content = file_obj.read().decode('utf-8-sig')
+        reader  = csv.DictReader(io.StringIO(content))
+        return [row for row in reader], None
+
+    def _parse_excel(self, file_obj):
+        try:
+            import openpyxl
+        except ImportError:
+            return [], 'openpyxl is required for Excel import. Install it or use CSV.'
+        import io
+        wb      = openpyxl.load_workbook(io.BytesIO(file_obj.read()), read_only=True, data_only=True)
+        ws      = wb.active
+        raw     = ws.iter_rows(values_only=True)
+        headers = [str(h).strip().lower() if h else '' for h in next(raw, [])]
+        rows    = []
+        for row in raw:
+            if any(cell is not None for cell in row):
+                rows.append({headers[i]: (str(row[i]).strip() if row[i] is not None else '') for i in range(len(headers))})
+        return rows, None
+
+    def _import_students(self, rows, school):
+        from django.db import transaction
+        from accounts.models import StudentProfile
+        User = get_user_model()
+        created, updated, errors = [], [], []
+        for idx, row in enumerate(rows, start=2):
+            email = (row.get('email') or '').strip().lower()
+            if not email:
+                errors.append({'row': idx, 'reason': 'email is required'})
+                continue
+            first_name = (row.get('first_name') or '').strip()
+            last_name  = (row.get('last_name')  or '').strip()
+            try:
+                with transaction.atomic():
+                    user, is_new = User.objects.get_or_create(
+                        email=email,
+                        defaults={'first_name': first_name, 'last_name': last_name, 'username': email},
+                    )
+                    if not is_new:
+                        if first_name: user.first_name = first_name
+                        if last_name:  user.last_name  = last_name
+                        user.save(update_fields=['first_name', 'last_name'])
+                    membership, _ = SchoolMembership.objects.get_or_create(
+                        school=school, user=user,
+                        defaults={'role': SchoolMembership.SchoolRole.STUDENT, 'is_active': True},
+                    )
+                    if not membership.is_active:
+                        membership.is_active = True
+                        membership.save(update_fields=['is_active'])
+                    profile_defaults = {
+                        f: (row.get(f) or '').strip()
+                        for f in ('admission_number', 'date_of_birth', 'gender', 'guardian_name', 'guardian_phone')
+                        if (row.get(f) or '').strip()
+                    }
+                    StudentProfile.objects.update_or_create(user=user, school=school, defaults=profile_defaults)
+                    (created if is_new else updated).append({'row': idx, 'email': email})
+            except Exception as exc:
+                errors.append({'row': idx, 'email': email, 'reason': str(exc)})
+        return {'created': created, 'updated': updated, 'errors': errors,
+                'summary': {'created': len(created), 'updated': len(updated), 'errors': len(errors)}}
+
+    def _import_teachers(self, rows, school):
+        from django.db import transaction
+        User = get_user_model()
+        created, updated, errors = [], [], []
+        for idx, row in enumerate(rows, start=2):
+            email = (row.get('email') or '').strip().lower()
+            if not email:
+                errors.append({'row': idx, 'reason': 'email is required'})
+                continue
+            first_name = (row.get('first_name') or '').strip()
+            last_name  = (row.get('last_name')  or '').strip()
+            try:
+                with transaction.atomic():
+                    user, is_new = User.objects.get_or_create(
+                        email=email,
+                        defaults={'first_name': first_name, 'last_name': last_name, 'username': email},
+                    )
+                    if not is_new:
+                        if first_name: user.first_name = first_name
+                        if last_name:  user.last_name  = last_name
+                        user.save(update_fields=['first_name', 'last_name'])
+                    membership, _ = SchoolMembership.objects.get_or_create(
+                        school=school, user=user,
+                        defaults={'role': SchoolMembership.SchoolRole.TEACHER, 'is_active': True},
+                    )
+                    if not membership.is_active:
+                        membership.is_active = True
+                        membership.save(update_fields=['is_active'])
+                    (created if is_new else updated).append({'row': idx, 'email': email})
+            except Exception as exc:
+                errors.append({'row': idx, 'email': email, 'reason': str(exc)})
+        return {'created': created, 'updated': updated, 'errors': errors,
+                'summary': {'created': len(created), 'updated': len(updated), 'errors': len(errors)}}
+
+    def _import_parents(self, rows, school):
+        from django.db import transaction
+        from parents.models import ParentProfile
+        User = get_user_model()
+        created, updated, errors = [], [], []
+        for idx, row in enumerate(rows, start=2):
+            email = (row.get('email') or '').strip().lower()
+            if not email:
+                errors.append({'row': idx, 'reason': 'email is required'})
+                continue
+            first_name = (row.get('first_name') or '').strip()
+            last_name  = (row.get('last_name')  or '').strip()
+            try:
+                with transaction.atomic():
+                    user, is_new = User.objects.get_or_create(
+                        email=email,
+                        defaults={'first_name': first_name, 'last_name': last_name, 'username': email},
+                    )
+                    if not is_new:
+                        if first_name: user.first_name = first_name
+                        if last_name:  user.last_name  = last_name
+                        user.save(update_fields=['first_name', 'last_name'])
+                    membership, _ = SchoolMembership.objects.get_or_create(
+                        school=school, user=user,
+                        defaults={'role': SchoolMembership.SchoolRole.PARENT, 'is_active': True},
+                    )
+                    if not membership.is_active:
+                        membership.is_active = True
+                        membership.save(update_fields=['is_active'])
+                    profile_defaults = {
+                        f: (row.get(f) or '').strip()
+                        for f in ('phone', 'relationship')
+                        if (row.get(f) or '').strip()
+                    }
+                    ParentProfile.objects.update_or_create(user=user, school=school, defaults=profile_defaults)
+                    student_email = (row.get('student_email') or '').strip().lower()
+                    if student_email:
+                        try:
+                            student_user = User.objects.get(email=student_email)
+                            from schools.models import ParentStudentLink
+                            ParentStudentLink.objects.get_or_create(
+                                parent=user, student=student_user, school=school,
+                                defaults={'status': 'active'},
+                            )
+                        except User.DoesNotExist:
+                            pass
+                    (created if is_new else updated).append({'row': idx, 'email': email})
+            except Exception as exc:
+                errors.append({'row': idx, 'email': email, 'reason': str(exc)})
+        return {'created': created, 'updated': updated, 'errors': errors,
+                'summary': {'created': len(created), 'updated': len(updated), 'errors': len(errors)}}
+
+
+class BulkImportTemplateView(APIView):
+    """
+    GET /api/v1/schools/import/template/?type=students|teachers|parents
+    Returns a CSV template with the correct column headers.
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    TEMPLATES = {
+        'students': 'first_name,last_name,email,admission_number,date_of_birth,gender,guardian_name,guardian_phone\n',
+        'teachers': 'first_name,last_name,email,phone,subject\n',
+        'parents':  'first_name,last_name,email,phone,student_email,relationship\n',
+    }
+
+    def get(self, request):
+        from django.http import HttpResponse
+        import_type = request.query_params.get('type', 'students').lower()
+        if import_type not in self.TEMPLATES:
+            return Response({'detail': 'type must be students, teachers, or parents.'}, status=status.HTTP_400_BAD_REQUEST)
+        response = HttpResponse(self.TEMPLATES[import_type], content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{import_type}_import_template.csv"'
+        return response
+
+
+class PromotionPreviewView(APIView):
+    """
+    POST /api/v1/schools/promotions/preview/
+    Dry-run promotion — returns what would happen without making DB changes.
+    Body: { "from_session_id": "<uuid>", "to_session_id": "<uuid>" }
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def post(self, request):
+        school  = request.school
+        from_id = request.data.get('from_session_id')
+        to_id   = request.data.get('to_session_id')
+        if not from_id or not to_id:
+            return Response({'detail': 'from_session_id and to_session_id are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        from_session = get_object_or_404(AcademicSession, id=from_id, school=school)
+        to_session   = get_object_or_404(AcademicSession, id=to_id,   school=school)
+        from core.services.promotion_service import preview_promotion
+        return Response(preview_promotion(school, from_session, to_session))
+
+
+class PromotionApplyView(APIView):
+    """
+    POST /api/v1/schools/promotions/apply/
+    Apply class promotion — creates new assignments, marks old ones.
+    Body: { "from_session_id": "<uuid>", "to_session_id": "<uuid>" }
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def post(self, request):
+        school  = request.school
+        from_id = request.data.get('from_session_id')
+        to_id   = request.data.get('to_session_id')
+        if not from_id or not to_id:
+            return Response({'detail': 'from_session_id and to_session_id are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        from_session = get_object_or_404(AcademicSession, id=from_id, school=school)
+        to_session   = get_object_or_404(AcademicSession, id=to_id,   school=school)
+        if ClassPromotion.objects.filter(
+            school=school, from_session=from_session, to_session=to_session,
+            status=ClassPromotion.Status.APPLIED,
+        ).exists():
+            return Response(
+                {'detail': 'A promotion for this session pair has already been applied.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        from core.services.promotion_service import apply_promotion
+        promotion = apply_promotion(school, from_session, to_session, promoted_by=request.user, request=request)
+        return Response({
+            'id':        str(promotion.id),
+            'status':    promotion.status,
+            'promoted':  promotion.summary.get('promoted', 0),
+            'graduated': promotion.summary.get('graduated', 0),
+            'skipped':   promotion.summary.get('skipped', 0),
+            'applied_at': promotion.applied_at.isoformat() if promotion.applied_at else None,
+        }, status=status.HTTP_201_CREATED)
+
+
+class PromotionUndoView(APIView):
+    """
+    POST /api/v1/schools/promotions/<promotion_id>/undo/
+    Undo a previously applied promotion.
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def post(self, request, promotion_id):
+        school    = request.school
+        promotion = get_object_or_404(ClassPromotion, id=promotion_id, school=school)
+        if promotion.status != ClassPromotion.Status.APPLIED:
+            return Response(
+                {'detail': f'Cannot undo a promotion with status "{promotion.status}".'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        from core.services.promotion_service import undo_promotion
+        try:
+            promotion = undo_promotion(promotion, undone_by=request.user, request=request)
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            'id':        str(promotion.id),
+            'status':    promotion.status,
+            'undone_at': promotion.undone_at.isoformat() if promotion.undone_at else None,
+        })
+
+
+class PromotionReportView(APIView):
+    """
+    GET /api/v1/schools/promotions/
+    Returns all promotion records for the school.
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get(self, request):
+        from core.services.promotion_service import get_promotion_report
+        return Response({'promotions': get_promotion_report(request.school)})
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PHASE 7B VIEWS — PART 2 (Tasks 6-9)
+# Appended to schools/views.py
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+class SchoolBrandingView(APIView):
+    """
+    GET  /api/v1/schools/branding/  — retrieve current branding context
+    PATCH /api/v1/schools/branding/ — update branding fields (school admin only)
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext]
+
+    def get(self, request):
+        from core.services.branding_service import get_branding_context
+        return Response(get_branding_context(request.school))
+
+    def patch(self, request):
+        school     = request.school
+        membership = SchoolMembership.objects.filter(school=school, user=request.user, is_active=True).first()
+        if not membership or membership.role != SchoolMembership.SchoolRole.SCHOOL_ADMIN:
+            return Response({'detail': 'Only school admins can update branding.'}, status=status.HTTP_403_FORBIDDEN)
+        from core.services.branding_service import update_branding
+        branding = update_branding(school, request.data, request=request)
+        return Response({
+            'id':                      str(branding.id),
+            'primary_color':           branding.primary_color,
+            'secondary_color':         branding.secondary_color,
+            'accent_color':            branding.accent_color,
+            'motto':                   branding.motto,
+            'tagline':                 branding.tagline,
+            'report_header_text':      branding.report_header_text,
+            'certificate_header_text': branding.certificate_header_text,
+            'report_footer_text':      branding.report_footer_text,
+            'certificate_footer_text': branding.certificate_footer_text,
+            'logo_url':                branding.logo.url if branding.logo else None,
+            'favicon_url':             branding.favicon.url if branding.favicon else None,
+            'has_signature':           bool(branding.principal_signature),
+            'has_stamp':               bool(branding.stamp_image),
+            'updated_at':              branding.updated_at.isoformat(),
+        })
+
+
+class StudentIDCardView(APIView):
+    """
+    GET /api/v1/schools/documents/id-card/<student_id>/
+    Returns structured data for a student ID card.
+    Add ?format=pdf to get a PDF response (requires ReportLab).
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get(self, request, student_id):
+        from django.http import HttpResponse
+        from core.services.document_service import generate_student_id_card_data, generate_pdf_bytes
+        from core.services.audit_service import log_action, AuditAction
+        school       = request.school
+        student_user = get_object_or_404(get_user_model(), id=student_id)
+        data         = generate_student_id_card_data(student_user, school)
+        log_action(action=AuditAction.DOCUMENT_GENERATED, actor=request.user, school=school, request=request,
+                   metadata={'document_type': 'student_id_card', 'student_id': str(student_id)})
+        if request.query_params.get('format') == 'pdf':
+            pdf_bytes = generate_pdf_bytes(data)
+            if pdf_bytes:
+                resp = HttpResponse(pdf_bytes, content_type='application/pdf')
+                resp['Content-Disposition'] = f'inline; filename="id_card_{student_id}.pdf"'
+                return resp
+            return Response({'detail': 'PDF generation unavailable. Install ReportLab.'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(data)
+
+
+class ResultSheetView(APIView):
+    """
+    GET /api/v1/schools/documents/result-sheet/<student_id>/
+    Query params: term_id (optional), session_id (optional), format=pdf
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get(self, request, student_id):
+        from django.http import HttpResponse
+        from core.services.document_service import generate_result_sheet_data, generate_pdf_bytes
+        from core.services.audit_service import log_action, AuditAction
+        school       = request.school
+        student_user = get_object_or_404(get_user_model(), id=student_id)
+
+        term    = None
+        session = None
+        term_id    = request.query_params.get('term_id')
+        session_id = request.query_params.get('session_id')
+        if term_id:
+            from .models import Term
+            term = Term.objects.filter(id=term_id).first()
+        if session_id:
+            session = AcademicSession.objects.filter(id=session_id, school=school).first()
+
+        data = generate_result_sheet_data(student_user, school, term=term, session=session)
+        log_action(action=AuditAction.DOCUMENT_GENERATED, actor=request.user, school=school, request=request,
+                   metadata={'document_type': 'result_sheet', 'student_id': str(student_id)})
+        if request.query_params.get('format') == 'pdf':
+            pdf_bytes = generate_pdf_bytes(data)
+            if pdf_bytes:
+                resp = HttpResponse(pdf_bytes, content_type='application/pdf')
+                resp['Content-Disposition'] = f'inline; filename="result_sheet_{student_id}.pdf"'
+                return resp
+            return Response({'detail': 'PDF generation unavailable. Install ReportLab.'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(data)
+
+
+class ReportCardView(APIView):
+    """
+    GET /api/v1/schools/documents/report-card/<student_id>/
+    Query params: session_id (optional), format=pdf
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get(self, request, student_id):
+        from django.http import HttpResponse
+        from core.services.document_service import generate_report_card_data, generate_pdf_bytes
+        from core.services.audit_service import log_action, AuditAction
+        school       = request.school
+        student_user = get_object_or_404(get_user_model(), id=student_id)
+
+        session    = None
+        session_id = request.query_params.get('session_id')
+        if session_id:
+            session = AcademicSession.objects.filter(id=session_id, school=school).first()
+
+        data = generate_report_card_data(student_user, school, session=session)
+        log_action(action=AuditAction.DOCUMENT_GENERATED, actor=request.user, school=school, request=request,
+                   metadata={'document_type': 'report_card', 'student_id': str(student_id)})
+        if request.query_params.get('format') == 'pdf':
+            pdf_bytes = generate_pdf_bytes(data)
+            if pdf_bytes:
+                resp = HttpResponse(pdf_bytes, content_type='application/pdf')
+                resp['Content-Disposition'] = f'inline; filename="report_card_{student_id}.pdf"'
+                return resp
+            return Response({'detail': 'PDF generation unavailable. Install ReportLab.'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(data)
+
+
+class ExamSlipView(APIView):
+    """
+    GET /api/v1/schools/documents/exam-slip/<student_id>/?exam_id=<uuid>
+    Returns structured data for an examination slip.
+    Add ?format=pdf to get a PDF response.
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get(self, request, student_id):
+        from django.http import HttpResponse
+        from core.services.document_service import generate_exam_slip_data, generate_pdf_bytes
+        from core.services.audit_service import log_action, AuditAction
+        school       = request.school
+        student_user = get_object_or_404(get_user_model(), id=student_id)
+        exam_id      = request.query_params.get('exam_id')
+        if not exam_id:
+            return Response({'detail': 'exam_id query parameter is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            from exams.models import Exam
+            exam = Exam.objects.get(id=exam_id)
+        except Exception:
+            return Response({'detail': 'Exam not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        data = generate_exam_slip_data(student_user, school, exam)
+        log_action(action=AuditAction.DOCUMENT_GENERATED, actor=request.user, school=school, request=request,
+                   metadata={'document_type': 'exam_slip', 'student_id': str(student_id), 'exam_id': exam_id})
+        if request.query_params.get('format') == 'pdf':
+            pdf_bytes = generate_pdf_bytes(data)
+            if pdf_bytes:
+                resp = HttpResponse(pdf_bytes, content_type='application/pdf')
+                resp['Content-Disposition'] = f'inline; filename="exam_slip_{student_id}.pdf"'
+                return resp
+            return Response({'detail': 'PDF generation unavailable. Install ReportLab.'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(data)
+
+
+class CertificateView(APIView):
+    """
+    GET /api/v1/schools/documents/certificate/<student_id>/
+    Query params: type=completion|graduation (default: completion), format=pdf
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get(self, request, student_id):
+        from django.http import HttpResponse
+        from core.services.document_service import generate_certificate_data, generate_pdf_bytes
+        from core.services.audit_service import log_action, AuditAction
+        school           = request.school
+        student_user     = get_object_or_404(get_user_model(), id=student_id)
+        certificate_type = request.query_params.get('type', 'completion')
+
+        data = generate_certificate_data(student_user, school, certificate_type=certificate_type)
+        log_action(action=AuditAction.DOCUMENT_GENERATED, actor=request.user, school=school, request=request,
+                   metadata={'document_type': 'certificate', 'certificate_type': certificate_type, 'student_id': str(student_id)})
+        if request.query_params.get('format') == 'pdf':
+            pdf_bytes = generate_pdf_bytes(data)
+            if pdf_bytes:
+                resp = HttpResponse(pdf_bytes, content_type='application/pdf')
+                resp['Content-Disposition'] = f'inline; filename="certificate_{student_id}.pdf"'
+                return resp
+            return Response({'detail': 'PDF generation unavailable. Install ReportLab.'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        return Response(data)
+
+
+class AuditLogListView(APIView):
+    """
+    GET /api/v1/schools/audit-logs/
+    Returns paginated audit logs for the school.
+    Query params: action, limit (default 50), offset (default 0)
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get(self, request):
+        from core.services.audit_service import get_school_audit_logs
+        school = request.school
+        action = request.query_params.get('action')
+        limit  = min(int(request.query_params.get('limit',  50)), 200)
+        offset = int(request.query_params.get('offset', 0))
+
+        logs = get_school_audit_logs(school, action=action, limit=limit, offset=offset)
+        total = AuditLog.objects.filter(school=school).count()
+
+        return Response({
+            'count':  total,
+            'limit':  limit,
+            'offset': offset,
+            'results': [
+                {
+                    'id':           str(log.id),
+                    'action':       log.action,
+                    'action_display': log.get_action_display(),
+                    'actor':        log.actor.get_full_name() if log.actor else 'System',
+                    'actor_email':  log.actor.email if log.actor else None,
+                    'target_type':  log.target_type,
+                    'target_repr':  log.target_repr,
+                    'metadata':     log.metadata,
+                    'ip_address':   log.ip_address,
+                    'created_at':   log.created_at.isoformat(),
+                }
+                for log in logs
+            ],
+        })
+
+
+class SchoolSettingsDetailView(APIView):
+    """
+    GET   /api/v1/schools/settings/full/  — retrieve full school settings
+    PATCH /api/v1/schools/settings/full/  — update school info + settings
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get(self, request):
+        from core.services.school_settings_service import get_full_school_settings
+        return Response(get_full_school_settings(request.school))
+
+    def patch(self, request):
+        from core.services.school_settings_service import update_school_info, update_school_settings
+        school = request.school
+        data   = request.data
+
+        # Split into school-level vs settings-level fields
+        school_fields   = {'name', 'email', 'phone', 'address', 'city', 'state', 'country', 'website'}
+        settings_fields = {
+            'principal_name', 'motto', 'timezone', 'grading_system',
+            'grading_scale', 'academic_year_start_month', 'allow_parent_access',
+            'exam_proctoring_enabled', 'max_login_attempts', 'session_timeout_minutes',
+        }
+
+        school_data   = {k: v for k, v in data.items() if k in school_fields}
+        settings_data = {k: v for k, v in data.items() if k in settings_fields}
+
+        if school_data:
+            update_school_info(school, school_data, request=request)
+        if settings_data:
+            update_school_settings(school, settings_data, request=request)
+
+        from core.services.school_settings_service import get_full_school_settings
+        return Response(get_full_school_settings(school))
+
+
+class GradingScaleView(APIView):
+    """
+    GET   /api/v1/schools/settings/grading/  — retrieve grading scale + pass mark
+    PUT   /api/v1/schools/settings/grading/  — replace grading scale
+    """
+    permission_classes = [permissions.IsAuthenticated, HasSchoolContext, IsSchoolAdmin]
+
+    def get(self, request):
+        from core.services.school_settings_service import get_grading_scale, get_pass_mark
+        school = request.school
+        return Response({
+            'grading_scale': get_grading_scale(school),
+            'pass_mark':     get_pass_mark(school),
+        })
+
+    def put(self, request):
+        from core.services.school_settings_service import update_grading_scale
+        school        = request.school
+        grading_scale = request.data.get('grading_scale')
+        pass_mark     = request.data.get('pass_mark')
+
+        if not grading_scale or not isinstance(grading_scale, dict):
+            return Response({'detail': 'grading_scale must be a non-empty object.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        settings_obj = update_grading_scale(school, grading_scale, pass_mark=pass_mark)
+        return Response({
+            'grading_scale': settings_obj.grading_scale,
+            'pass_mark':     pass_mark or settings_obj.grading_scale.get('_pass_mark', 40),
+        })
